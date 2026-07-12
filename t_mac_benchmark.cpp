@@ -38,7 +38,6 @@ struct SignedWideningAdder {
     inline __m256i get_high() { return lhs_high; }
 };
 
-// 一次只能掃描 32 個 activation (受限於 gather 指令佈局)
 inline int32_t partial_max_g4_int8_k8(float* lut_scales, float* b) {
     const __m256i vec_bi = _mm256_set_epi32(112, 96, 80, 64, 48, 32, 16, 0);
 
@@ -176,7 +175,7 @@ inline int32_t tbl_update_avx2(int32_t m, int32_t k_groups, float_type* c, int8_
 
 
 int main() {
-    std::cout << "初始化 T-MAC AVX2 Benchmark (N=1 GEMV)..." << std::endl;
+    std::cout << "Initializing T-MAC AVX2 Benchmark (N=1 GEMV)..." << std::endl;
     std::vector<int> sizes = {256, 1024, 2048, 4096, 8192};
     const int Bits = 4;
     const int ActK = 32;
@@ -192,8 +191,6 @@ int main() {
         int k = size;
 
         int k_groups = k / 4;
-        // num_groups: tbl_update 的 kk 迴圈以 ActK 為步進跨過 k_groups,
-        // 所以需要 k_groups/ActK 組獨立的 scale/bias -- 這個公式不變
         int num_groups = k_groups / ActK;
 
         float* activations = (float*)_mm_malloc(k * sizeof(float), 32);
@@ -213,23 +210,19 @@ int main() {
         int iterations = 100;
         auto start = std::chrono::high_resolution_clock::now();
 
-        // [修正] 每組要橫跨 ActK*4 個 activation,而不是 ActK 個,
-        // 這樣才跟 tbl_update 的 kk 迴圈粒度(每次跳過 ActK 個 k_groups = ActK*4 個 activation)對齊。
-        const int group_span = ActK * 4;   // 每組橫跨的 activation 數量 (=128)
+        const int group_span = ActK * 4;  
 
         for (int i = 0; i < iterations; ++i) {
             for (int g = 0; g < num_groups; ++g) {
                 lut_scales[g] = 0.0f;
 
-                // partial_max 一次只能掃 32 個 activation (受限於其內部 gather 佈局),
-                // 這組需要涵蓋 group_span(128)個,所以連續呼叫 4 次,each 更新同一個 running max
                 for (int sub = 0; sub < group_span / 32; ++sub) {
                     partial_max_g4_int8_k8(&lut_scales[g], activations + g * group_span + sub * 32);
                 }
 
                 lut_ctor_g4_int8_avx2(
-                    group_span,                       // act_k = 128,不是 32
-                    qlut + g * (ActK * 16),            // 每組 512 bytes,對齊 lut_ctor 實際寫入量
+                    group_span,                       
+                    qlut + g * (ActK * 16),            
                     activations + g * group_span,
                     &lut_scales[g],
                     &lut_biases[g]
