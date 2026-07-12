@@ -1,0 +1,10 @@
+# 編譯產物
+*.o
+*.out
+t_mac_benchmark
+mkl_benchmark
+t_mac_debug
+
+# 常見暫存檔
+*.exe
+.vscode/
