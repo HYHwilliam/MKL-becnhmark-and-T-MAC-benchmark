@@ -6,6 +6,7 @@
 #include <chrono>
 #include <iomanip>
 #include <cmath>
+#include "common/benchmark.h"
 
 typedef float float_type;
 
@@ -202,11 +203,7 @@ int main() {
     const int Bits = 4;
     const int ActK = 32;
 
-    std::cout << "------------------------------------------------------\n";
-    std::cout << std::left << std::setw(15) << "Matrix Size"
-              << std::setw(15) << "Latency (ms)"
-              << "Performance (GFLOPS)" << std::endl;
-    std::cout << "------------------------------------------------------\n";
+    print_benchmark_header();
 
     for (int size : sizes) {
         int m = size;
@@ -259,12 +256,8 @@ int main() {
 
         double avg_time_ms = duration.count() / iterations;
 
-        double ops = 2.0 * m * k;
-        double gflops = (ops / (avg_time_ms / 1000.0)) / 1e9;
-
-        std::cout << std::left << size << "x" << size << "x1    "
-                  << std::setw(15) << avg_time_ms
-                  << gflops << " GFLOPS" << std::endl;
+        double gflops = compute_gflops(m, k, avg_time_ms);
+        print_benchmark_row(size, avg_time_ms, gflops);
 
         bool has_nan_or_inf = false;
         double checksum = 0.0;

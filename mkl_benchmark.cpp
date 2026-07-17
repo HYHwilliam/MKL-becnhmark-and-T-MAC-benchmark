@@ -4,7 +4,8 @@
 #include <mkl.h>
 #include <immintrin.h>   
 #include <iomanip>
-#include <cmath>          
+#include <cmath>
+#include "common/benchmark.h"
 
 static inline MKL_F16 float_to_half(float f) {
     __m128 v = _mm_set_ss(f);
@@ -30,11 +31,7 @@ int main() {
     const int n = 1;
     int iterations = 100;
 
-    std::cout << "------------------------------------------------------\n";
-    std::cout << std::left << std::setw(15) << "Matrix Size"
-              << std::setw(15) << "Latency (ms)"
-              << "Performance (GFLOPS)" << std::endl;   
-    std::cout << "------------------------------------------------------\n";
+    print_benchmark_header();
 
     for (int size : sizes) {
         int m = size, k = size;
@@ -70,12 +67,8 @@ int main() {
 
         double avg_time_ms = duration.count() / iterations;
 
-        double ops = 2.0 * m * k;
-        double gflops = (ops / (avg_time_ms / 1000.0)) / 1e9;
-
-        std::cout << std::left << size << "x" << size << "x1    "
-                  << std::setw(15) << avg_time_ms
-                  << gflops << " GFLOPS" << std::endl;
+        double gflops = compute_gflops(m, k, avg_time_ms);
+        print_benchmark_row(size, avg_time_ms, gflops);
 
         float sample = half_to_float(C[0]);
         float expected = 2.0f * k;
