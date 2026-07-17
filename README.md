@@ -1,31 +1,30 @@
-# T-MAC AVX2 vs. MKL FP16 GEMV Benchmark
+# T-MAC AVX2 vs. LUT-GEMM (CPU) vs. MKL FP16 GEMV Benchmark
 
-比較 T-MAC（4-bit 量化 + Lookup Table）與 Intel MKL（FP16 傳統浮點運算）在單執行緒 GEMV（矩陣乘向量，`M x K x 1`）情境下的效能表現。
+比較 T-MAC（4-bit 量化 + Lookup Table）、LUT-GEMM（官方 CUDA kernel 的 CPU 移植版）與 Intel MKL（FP16 傳統浮點運算）在單執行緒 GEMV（矩陣乘向量，`M x K x 1`）情境下的效能表現。
 
 ## 概述
 
-- **T-MAC**：以 4-bit 量化權重搭配預建查表（LUT），用查表取代乘法運算，加速低位元推論。
+- **T-MAC**：以 4-bit 量化權重搭配預建查表（LUT，μ=4），用查表取代乘法運算，加速低位元推論。
+- **LUT-GEMM**：移植自 [NAVER LUT-GEMM 官方 CUDA 核心](https://github.com/naver-aics/lut-gemm)（`mv_fp16_bias.hpp` 的 `_nqmv_bias`），採用 μ=8 的查表設計，提供純量（Scalar）與 AVX2 兩種 CPU 版本。
 - **MKL**：使用 Intel MKL 的 `cblas_hgemm`，做為傳統 FP16 浮點乘加的效能基準。
-- 兩者皆固定 `N=1`（GEMV），對應語言模型推論階段每次生成一個 token 的實際運算情境。
-- 皆附上正確性驗證（Checksum），避免比較到「跑得快但算錯」的無意義數字。
+- 三者皆固定 `N=1`（GEMV），對應語言模型推論階段每次生成一個 token 的實際運算情境。
+- 皆附上正確性驗證（Checksum 或解析解比對），避免比較到「跑得快但算錯」的無意義數字。
 
 ## 測試環境
 
-本專案於兩台硬體規格不同的機器上執行，結果分開列出以利比較。原始數據分別存於 `benchmark_results.csv`（電腦 A）與 `benchmark_results_ultra9_185h.csv`（電腦 B）。
-
-### 電腦 A：Intel Ultra 7 258V
-
-#### 硬體規格
+### 硬體規格
 
 | 項目 | 規格 |
 |---|---|
 | 處理器 | Intel(R) Core(TM) Ultra 7 258V @ 2.20GHz |
-| 記憶體 | 32 GB RAM |
-| 顯示卡 | （本測試未使用 GPU） |
+| 記憶體 | 已安裝 RAM（依裝置實際容量） |
+| 顯示卡 | Intel(R) Arc(TM) 140V GPU (16GB)（本測試未使用 GPU） |
 | 作業系統 | Windows 11 家用版，64 位元 |
 | 測試環境 | WSL2（Windows Subsystem for Linux） |
 
-#### 軟體環境
+> 本測試為 CPU 單執行緒 Benchmark，未使用 GPU 加速。LUT-GEMM 官方設計目標平台為 GPU，本專案僅測試其移植至 CPU 後的表現。
+
+### 軟體環境
 
 | 項目 | 版本 / 說明 |
 |---|---|
@@ -34,30 +33,6 @@
 | 編譯器 | GCC 13（g++） |
 | 指令集 | AVX2 + FMA + F16C |
 | 數學函式庫 | Intel oneAPI MKL |
-
-### 電腦 B：Intel Ultra 9 185H
-
-#### 硬體規格
-
-| 項目 | 規格 |
-|---|---|
-| 處理器 | Intel(R) Core(TM) Ultra 9 185H（11 核 22 執行緒）@ ~3.07GHz |
-| 記憶體 | 16 GB RAM（WSL2 配置值） |
-| 顯示卡 | （本測試未使用 GPU） |
-| 作業系統 | Windows 11，64 位元 |
-| 測試環境 | WSL2（Windows Subsystem for Linux） |
-
-#### 軟體環境
-
-| 項目 | 版本 / 說明 |
-|---|---|
-| WSL | WSL2 |
-| Linux 發行版 | Ubuntu 22.04.5 LTS (Jammy Jellyfish) |
-| 編譯器 | GCC 11.4.0（g++） |
-| 指令集 | AVX2 + FMA + F16C |
-| 數學函式庫 | Intel oneAPI MKL |
-
-> 兩台機器皆為 CPU 單執行緒 Benchmark，未使用 GPU 加速。
 
 ## 環境建置
 
@@ -80,7 +55,6 @@ sudo apt install -y build-essential g++
 依照 [Intel oneMKL 官方安裝指南（Linux / apt）](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html?operatingsystem=linux&linux-install=apt) 進行安裝：
 
 ```bash
-# 設定 Intel oneAPI 的 apt 套件庫金鑰與來源
 wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
   | gpg --dearmor \
   | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
@@ -115,6 +89,24 @@ g++ -O2 -mavx2 -mfma t_mac_benchmark.cpp -o t_mac_benchmark
 ./t_mac_benchmark
 ```
 
+### LUT-GEMM CPU Benchmark（純量版）
+
+```bash
+g++ -O3 lut_gemm_cpu_benchmark.cpp -o lut_gemm_cpu_benchmark
+./lut_gemm_cpu_benchmark
+```
+
+> 純量版未使用任何 SIMD intrinsics，不需要額外的 `-m` 指令集旗標。
+
+### LUT-GEMM CPU Benchmark（AVX2 優化版）
+
+```bash
+g++ -O3 -mavx2 -mfma lut_gemm_avx2_benchmark.cpp -o lut_gemm_avx2_benchmark
+./lut_gemm_avx2_benchmark
+```
+
+> 必須同時加上 `-mavx2`（`_mm256_i32gather_ps` 為 AVX2 指令）與 `-mfma`（`_mm256_fmadd_ps` 為 FMA3 指令），缺一都會導致編譯期的 `inlining failed... target specific option mismatch` 錯誤。
+
 ### MKL FP16 Benchmark
 
 ```bash
@@ -131,148 +123,80 @@ export LD_LIBRARY_PATH=${MKLROOT}/lib/intel64:$LD_LIBRARY_PATH
 
 ### （選用）記憶體安全性檢查
 
-正式量測前，建議先以 AddressSanitizer 確認無記憶體越界問題：
+正式量測前，建議先以 AddressSanitizer 確認無記憶體越界問題（LUT-GEMM 的 gather 索引運算尤其容易出現越界，務必先跑過一次）：
 
 ```bash
-g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined t_mac_benchmark.cpp -o t_mac_debug
-./t_mac_debug
+g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined lut_gemm_avx2_benchmark.cpp -o lut_gemm_avx2_debug
+./lut_gemm_avx2_debug
 ```
 
 ## Benchmark 結果
 
-測試規模：`M = K = {256, 1024, 2048, 4096, 8192}`，`N = 1`，單執行緒，每組取 100 次迭代平均。
+測試規模：`M = K = {256, 1024, 2048, 4096, 8192}`，`N = 1`，單執行緒，T-MAC/MKL 每組取 100 次迭代平均，LUT-GEMM 純量版因速度較慢取 10 次迭代平均。
 
-### 電腦 A：Intel Ultra 7 258V
+### T-MAC AVX2 GEMV
 
-![benchmark](assets/benchmark_chart_light.png)
+| Matrix Size | Latency (ms) | Performance (GFLOPS) | Checksum |
+|---|---:|---:|---|
+| 256×256×1 | 0.0026 | 50.13 | 無 NaN/Inf |
+| 1024×1024×1 | 0.0316 | 66.34 | 無 NaN/Inf |
+| 2048×2048×1 | 0.1319 | 63.59 | 無 NaN/Inf |
+| 4096×4096×1 | 0.4557 | 73.64 | 無 NaN/Inf |
+| 8192×8192×1 | 1.4860 | 90.32 | 無 NaN/Inf |
 
-#### MKL FP16 GEMV
+### LUT-GEMM CPU AVX2 版
 
-<table>
-  <tr>
-    <th width="22%" align="left">Matrix Size</th>
-    <th width="15%" align="center">Latency (ms)</th>
-    <th width="18%" align="center">Performance (GFLOPS)</th>
-    <th width="43%" align="left">Checksum Verification</th>
-  </tr>
-  <tr>
-    <td><b>256 x 256 x 1</b></td>
-    <td align="center">0.0110604</td>
-    <td align="center">11.8505</td>
-    <td>C[0] = 512 (expected ~512) <b>OK</b></td>
-  </tr>
-  <tr>
-    <td><b>1024 x 1024 x 1</b></td>
-    <td align="center">0.184268</td>
-    <td align="center">11.3810</td>
-    <td>C[0] = 2048 (expected ~2048) <b>OK</b></td>
-  </tr>
-  <tr>
-    <td><b>2048 x 2048 x 1</b></td>
-    <td align="center">0.826103</td>
-    <td align="center">10.1544</td>
-    <td>C[0] = 4096 (expected ~4096) <b>OK</b></td>
-  </tr>
-  <tr>
-    <td><b>4096 x 4096 x 1</b></td>
-    <td align="center">2.324810</td>
-    <td align="center">14.4332</td>
-    <td>C[0] = 8192 (expected ~8192) <b>OK</b></td>
-  </tr>
-  <tr>
-    <td><b>8192 x 8192 x 1</b></td>
-    <td align="center">7.938100</td>
-    <td align="center">16.9080</td>
-    <td>C[0] = 16384 (expected ~16384) <b>OK</b></td>
-  </tr>
-</table>
+| Matrix Size | Latency (ms) | Performance (GFLOPS) | 解析解驗證 |
+|---|---:|---:|---|
+| 256×256×1 | 0.0246 | 5.32 | output[0]=-512  OK |
+| 1024×1024×1 | 0.5134 | 4.09 | output[0]=-2048  OK |
+| 2048×2048×1 | 1.6110 | 5.21 | output[0]=-4096  OK |
+| 4096×4096×1 | 10.4368 | 3.22 | output[0]=-8192  OK |
+| 8192×8192×1 | 118.772 | 1.13 | output[0]=-16384  OK |
 
-#### T-MAC AVX2 GEMV
+### MKL FP16 GEMV
 
-| Matrix Size | Latency (ms) | Performance (GFLOPS) | Checksum sum(out_c) |
-| :--- | :---: | :---: | :--- |
-| **256 x 256 x 1** | 0.00261465 | 50.1298 | $-4.9410 \times 10^6$ |
-| **1024 x 1024 x 1** | 0.03161200 | 66.3403 | $-7.9056 \times 10^7$ |
-| **2048 x 2048 x 1** | 0.13192500 | 63.5861 | $-3.1622 \times 10^8$ |
-| **4096 x 4096 x 1** | 0.45567100 | 73.6374 | $-1.2649 \times 10^9$ |
-| **8192 x 8192 x 1** | 1.48602000 | 90.3202 | $-5.0596 \times 10^9$ |
-
-### 電腦 B：Intel Ultra 9 185H
-
-![benchmark](assets/benchmark_chart_light_ultra9_185h.png)
-
-#### MKL FP16 GEMV
-
-<table>
-  <tr>
-    <th width="22%" align="left">Matrix Size</th>
-    <th width="15%" align="center">Latency (ms)</th>
-    <th width="18%" align="center">Performance (GFLOPS)</th>
-    <th width="43%" align="left">Checksum Verification</th>
-  </tr>
-  <tr>
-    <td><b>256 x 256 x 1</b></td>
-    <td align="center">0.00550452</td>
-    <td align="center">23.8117</td>
-    <td>C[0] = 512 (expected ~512) <b>OK</b></td>
-  </tr>
-  <tr>
-    <td><b>1024 x 1024 x 1</b></td>
-    <td align="center">0.107862</td>
-    <td align="center">19.4430</td>
-    <td>C[0] = 2048 (expected ~2048) <b>OK</b></td>
-  </tr>
-  <tr>
-    <td><b>2048 x 2048 x 1</b></td>
-    <td align="center">0.579191</td>
-    <td align="center">14.4833</td>
-    <td>C[0] = 4096 (expected ~4096) <b>OK</b></td>
-  </tr>
-  <tr>
-    <td><b>4096 x 4096 x 1</b></td>
-    <td align="center">1.779180</td>
-    <td align="center">18.8595</td>
-    <td>C[0] = 8192 (expected ~8192) <b>OK</b></td>
-  </tr>
-  <tr>
-    <td><b>8192 x 8192 x 1</b></td>
-    <td align="center">7.276950</td>
-    <td align="center">18.4442</td>
-    <td>C[0] = 16384 (expected ~16384) <b>OK</b></td>
-  </tr>
-</table>
-
-#### T-MAC AVX2 GEMV
-
-| Matrix Size | Latency (ms) | Performance (GFLOPS) | Checksum sum(out_c) |
-| :--- | :---: | :---: | :--- |
-| **256 x 256 x 1** | 0.00110915 | 118.173 | $-4.9410 \times 10^6$ |
-| **1024 x 1024 x 1** | 0.00953800 | 219.873 | $-7.9056 \times 10^7$ |
-| **2048 x 2048 x 1** | 0.03882950 | 216.037 | $-3.1622 \times 10^8$ |
-| **4096 x 4096 x 1** | 0.15490900 | 216.608 | $-1.2649 \times 10^9$ |
-| **8192 x 8192 x 1** | 0.63328000 | 211.941 | $-5.0596 \times 10^9$ |
+| Matrix Size | Latency (ms) | Performance (GFLOPS) | Checksum |
+|---|---:|---:|---|
+| 256×256×1 | 0.0111 | 11.85 |  OK |
+| 1024×1024×1 | 0.1843 | 11.38 |  OK |
+| 2048×2048×1 | 0.8261 | 10.15 |  OK |
+| 4096×4096×1 | 2.3248 | 14.43 |  OK |
+| 8192×8192×1 | 7.9381 | 16.91 |  OK |
 
 ## 重點結論
 
-- 相同 `M x K x 1` 規模下，T-MAC 的 GFLOPS 均顯著高於 MKL：電腦 A 約為 **4～6 倍**（8192 規模：90.3 vs. 16.9 GFLOPS），電腦 B 約為 **5～15 倍**（8192 規模：211.9 vs. 18.4 GFLOPS）。
-- 矩陣規模越大，T-MAC 的優勢越明顯，因建表成本可由更多輸出共同攤提；此趨勢在兩台機器上一致。
-- MKL 於小矩陣（256）效率偏低，隨規模放大才逐漸提升，兩台機器皆有相同情況。
-- 電腦 B 在 T-MAC 與 MKL 上的絕對 GFLOPS 皆高於電腦 A，但 T-MAC 的相對加速倍率在電腦 B 上更明顯，顯示查表法對硬體差異的需求可能與傳統浮點運算不同，可能可以藉由更多硬體的比較得到推論。
-- T-MAC 的 GFLOPS 為「等效 FLOPS」（相當於用傳統乘加完成同樣運算所需的運算量），並非實際執行的乘法次數，因查表法本身即刻意避開多數乘法。
-- 兩者皆為單執行緒、未做深度硬體調校的結果，目的在於公平比較，非各自硬體的效能極限。
+- **T-MAC 全面領先**：8192 規模下，T-MAC 是 MKL 的約 5.3 倍、是 LUT-GEMM（AVX2）的近 80 倍。
+- **矩陣越大，T-MAC 越快，LUT-GEMM 卻越慢**：T-MAC 的查表成本能被更多輸出攤提，規模越大優勢越明顯；LUT-GEMM 因 μ=8 導致 LUT 記憶體膨脹（K=8192 時約 1MB，遠超 CPU L1 快取容量），cache miss 隨規模增大而加劇，效能反而下滑。
+- **關鍵差異在查表指令**：T-MAC 的 16 格 LUT（μ=4）恰好落在 `_mm256_shuffle_epi8` 的定址範圍內，可用暫存器內單週期操作查表；LUT-GEMM 的 256 格 LUT（μ=8）超出此範圍，被迫使用 `_mm256_i32gather_ps`，該指令在多數 x86 CPU 上是拆解成多次獨立記憶體存取執行，效能接近純量版本。
+- **這是架構選擇的落差，而非移植錯誤**：LUT-GEMM 的 μ=8 設計是針對 GPU shared memory 高頻寬、低延遲特性最佳化的結果，移植到記憶體階層特性不同的 CPU 後，無法重現同等加速效果。
+- **MKL 為穩定基準線**：不使用量化或查表，效能不受矩陣結構影響，介於 10～17 GFLOPS，代表傳統浮點運算的效能水準；T-MAC 成功超越此基準，LUT-GEMM（CPU 版）則未能超越。
+- 所有測試皆為單執行緒、未做深度硬體調校，目的在於公平比較，非各方法的硬體效能極限。
 
 ## 正確性驗證方式
 
-| 項目 | T-MAC | MKL |
-|---|---|---|
-| 驗證方法 | 依固定合成輸入（activation 全為 `1.0f`、weight nibble 固定為 `0x1`）獨立推導理論期望值，逐元素與實際輸出比對 + NaN/Inf 檢查 | 已知輸入反推理論值（`C[0] = 2×K`）比對 |
-| 驗證強度 | 逐元素比對整個輸出陣列，可驗證數值正確性，可檢測記憶體污染、數值爆炸等異常 | 可精確驗證單點數值正確性（5% 容忍度） |
-| 限制 | 期望值僅針對本測試固定的合成輸入推導，非通用於任意weight/activation 組合 | 僅驗證單一元素，非全陣列 |
+| 項目 | T-MAC | LUT-GEMM | MKL |
+|---|---|---|---|
+| 驗證方法 | Checksum 加總 + NaN/Inf 檢查 | Checksum + 解析解比對（`output[0]=-2×K`） | 已知輸入反推理論值（`C[0]=2×K`）比對 |
+| 驗證強度 | 可檢測記憶體污染、數值爆炸等明顯異常 | 可精確驗證單點數值正確性 | 可精確驗證單點數值正確性（5% 容忍度） |
 
 ## 已知限制與注意事項
 
-- 本測試固定使用單執行緒（`OMP_NUM_THREADS=1` / `mkl_set_num_threads(1)`），未測試多執行緒平行效能。
-- T-MAC 核心邏輯（`lut_ctor`、`tbl_update`）基於 [T-MAC 官方原始碼](https://github.com/microsoft/T-MAC) 改寫，運算邏輯與數值計算方式未經更動。
-- 原始 T-MAC 演算法版權歸屬 Microsoft（詳見 [T-MAC 官方 Repository](https://github.com/microsoft/T-MAC)）。本專案為效能驗證與研究用途改寫。
-- 測試資料為固定合成數值（activation 全為 1.0，權重固定 pattern），非真實模型權重，僅用於效能與正確性驗證，不代表真實推論任務下的表現。
-- WSL2 環境可能因虛擬化層開銷（如記憶體存取延遲）與原生 Linux 環境有些微效能落差，非本測試控制範圍。
+- 本測試固定使用單執行緒，未測試多執行緒平行效能。
+- T-MAC 核心邏輯（`lut_ctor`、`tbl_update`）基於 [T-MAC 官方原始碼](https://github.com/microsoft/T-MAC) 改寫；LUT-GEMM 核心邏輯（LUT 建表、bias 讀取、查表累加）基於 [LUT-GEMM 官方 CUDA kernel](https://github.com/naver-aics/lut-gemm) 改寫，兩者運算邏輯與數值計算方式皆未經更動。
+- LUT-GEMM 的 μ=8 為官方原始設計，本專案未修改此參數；若改用較小的 μ（例如 μ=4）搭配 `shuffle_epi8`，可能可改善 CPU 效能，但將偏離官方原始設計，非本專案測試範圍。
+- 測試資料為固定合成數值，非真實模型權重，僅用於效能與正確性驗證，不代表真實推論任務下的表現。
+- WSL2 環境可能因虛擬化層開銷與原生 Linux 環境有些微效能落差，非本測試控制範圍。
+
+## 檔案結構
+├── t_mac_benchmark.cpp           # T-MAC AVX2 量化 GEMV benchmark
+├── lut_gemm_cpu_benchmark.cpp    # LUT-GEMM CPU 純量版 benchmark
+├── lut_gemm_avx2_benchmark.cpp   # LUT-GEMM CPU AVX2 優化版 benchmark
+├── mkl_benchmark.cpp             # Intel MKL FP16 GEMV benchmark
+└── README.md
+
+## 授權
+
+原始 T-MAC 演算法版權歸屬 Microsoft（詳見 [T-MAC 官方 Repository](https://github.com/microsoft/T-MAC)）。
+原始 LUT-GEMM 演算法版權歸屬 NAVER Cloud Corp.，採用 Apache License 2.0（詳見 [LUT-GEMM 官方 Repository](https://github.com/naver-aics/lut-gemm)）。
+本專案為效能驗證與教學用途改寫。
