@@ -17,8 +17,8 @@
 | 項目 | 規格 |
 |---|---|
 | 處理器 | Intel(R) Core(TM) Ultra 7 258V @ 2.20GHz |
-| 記憶體 | 已安裝 RAM（依裝置實際容量） |
-| 顯示卡 | Intel(R) Arc(TM) 140V GPU (16GB)（本測試未使用 GPU） |
+| 記憶體 | 32GB RAM |
+| 顯示卡 | （本測試未使用 GPU） |
 | 作業系統 | Windows 11 家用版，64 位元 |
 | 測試環境 | WSL2（Windows Subsystem for Linux） |
 
