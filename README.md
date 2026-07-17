@@ -188,13 +188,6 @@ g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined lut_gemm_avx2_benchmark.cpp
 - 測試資料為固定合成數值，非真實模型權重，僅用於效能與正確性驗證，不代表真實推論任務下的表現。
 - WSL2 環境可能因虛擬化層開銷與原生 Linux 環境有些微效能落差，非本測試控制範圍。
 
-## 檔案結構
-├── t_mac_benchmark.cpp           # T-MAC AVX2 量化 GEMV benchmark
-├── lut_gemm_cpu_benchmark.cpp    # LUT-GEMM CPU 純量版 benchmark
-├── lut_gemm_avx2_benchmark.cpp   # LUT-GEMM CPU AVX2 優化版 benchmark
-├── mkl_benchmark.cpp             # Intel MKL FP16 GEMV benchmark
-└── README.md
-
 ## 授權
 
 原始 T-MAC 演算法版權歸屬 Microsoft（詳見 [T-MAC 官方 Repository](https://github.com/microsoft/T-MAC)）。
