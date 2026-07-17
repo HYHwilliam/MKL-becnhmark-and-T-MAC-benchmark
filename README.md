@@ -11,7 +11,11 @@
 
 ## 測試環境
 
-### 硬體規格
+本專案於兩台硬體規格不同的機器上執行，結果分開列出以利比較。原始數據分別存於 `benchmark_results.csv`（電腦 A）與 `benchmark_results_ultra9_185h.csv`（電腦 B）。
+
+### 電腦 A：Intel Ultra 7 258V
+
+#### 硬體規格
 
 | 項目 | 規格 |
 |---|---|
@@ -21,9 +25,7 @@
 | 作業系統 | Windows 11 家用版，64 位元 |
 | 測試環境 | WSL2（Windows Subsystem for Linux） |
 
-> 本測試為 CPU 單執行緒 Benchmark，未使用 GPU 加速。
-
-### 軟體環境
+#### 軟體環境
 
 | 項目 | 版本 / 說明 |
 |---|---|
@@ -32,6 +34,30 @@
 | 編譯器 | GCC 13（g++） |
 | 指令集 | AVX2 + FMA + F16C |
 | 數學函式庫 | Intel oneAPI MKL |
+
+### 電腦 B：Intel Ultra 9 185H
+
+#### 硬體規格
+
+| 項目 | 規格 |
+|---|---|
+| 處理器 | Intel(R) Core(TM) Ultra 9 185H（11 核 22 執行緒）@ ~3.07GHz |
+| 記憶體 | 16 GB RAM（WSL2 配置值） |
+| 顯示卡 | （本測試未使用 GPU） |
+| 作業系統 | Windows 11，64 位元 |
+| 測試環境 | WSL2（Windows Subsystem for Linux） |
+
+#### 軟體環境
+
+| 項目 | 版本 / 說明 |
+|---|---|
+| WSL | WSL2 |
+| Linux 發行版 | Ubuntu 22.04.5 LTS (Jammy Jellyfish) |
+| 編譯器 | GCC 11.4.0（g++） |
+| 指令集 | AVX2 + FMA + F16C |
+| 數學函式庫 | Intel oneAPI MKL |
+
+> 兩台機器皆為 CPU 單執行緒 Benchmark，未使用 GPU 加速。
 
 ## 環境建置
 
@@ -116,9 +142,11 @@ g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined t_mac_benchmark.cpp -o t_ma
 
 測試規模：`M = K = {256, 1024, 2048, 4096, 8192}`，`N = 1`，單執行緒，每組取 100 次迭代平均。
 
+### 電腦 A：Intel Ultra 7 258V
+
 ![benchmark](assets/benchmark_chart_light.png)
 
-### MKL FP16 GEMV
+#### MKL FP16 GEMV
 
 <table>
   <tr>
@@ -159,7 +187,7 @@ g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined t_mac_benchmark.cpp -o t_ma
   </tr>
 </table>
 
-### T-MAC AVX2 GEMV
+#### T-MAC AVX2 GEMV
 
 | Matrix Size | Latency (ms) | Performance (GFLOPS) | Checksum sum(out_c) |
 | :--- | :---: | :---: | :--- |
@@ -169,11 +197,67 @@ g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined t_mac_benchmark.cpp -o t_ma
 | **4096 x 4096 x 1** | 0.45567100 | 73.6374 | $-1.2649 \times 10^9$ |
 | **8192 x 8192 x 1** | 1.48602000 | 90.3202 | $-5.0596 \times 10^9$ |
 
+### 電腦 B：Intel Ultra 9 185H
+
+![benchmark](assets/benchmark_chart_light_ultra9_185h.png)
+
+#### MKL FP16 GEMV
+
+<table>
+  <tr>
+    <th width="22%" align="left">Matrix Size</th>
+    <th width="15%" align="center">Latency (ms)</th>
+    <th width="18%" align="center">Performance (GFLOPS)</th>
+    <th width="43%" align="left">Checksum Verification</th>
+  </tr>
+  <tr>
+    <td><b>256 x 256 x 1</b></td>
+    <td align="center">0.00550452</td>
+    <td align="center">23.8117</td>
+    <td>C[0] = 512 (expected ~512) <b>OK</b></td>
+  </tr>
+  <tr>
+    <td><b>1024 x 1024 x 1</b></td>
+    <td align="center">0.107862</td>
+    <td align="center">19.4430</td>
+    <td>C[0] = 2048 (expected ~2048) <b>OK</b></td>
+  </tr>
+  <tr>
+    <td><b>2048 x 2048 x 1</b></td>
+    <td align="center">0.579191</td>
+    <td align="center">14.4833</td>
+    <td>C[0] = 4096 (expected ~4096) <b>OK</b></td>
+  </tr>
+  <tr>
+    <td><b>4096 x 4096 x 1</b></td>
+    <td align="center">1.779180</td>
+    <td align="center">18.8595</td>
+    <td>C[0] = 8192 (expected ~8192) <b>OK</b></td>
+  </tr>
+  <tr>
+    <td><b>8192 x 8192 x 1</b></td>
+    <td align="center">7.276950</td>
+    <td align="center">18.4442</td>
+    <td>C[0] = 16384 (expected ~16384) <b>OK</b></td>
+  </tr>
+</table>
+
+#### T-MAC AVX2 GEMV
+
+| Matrix Size | Latency (ms) | Performance (GFLOPS) | Checksum sum(out_c) |
+| :--- | :---: | :---: | :--- |
+| **256 x 256 x 1** | 0.00110915 | 118.173 | $-4.9410 \times 10^6$ |
+| **1024 x 1024 x 1** | 0.00953800 | 219.873 | $-7.9056 \times 10^7$ |
+| **2048 x 2048 x 1** | 0.03882950 | 216.037 | $-3.1622 \times 10^8$ |
+| **4096 x 4096 x 1** | 0.15490900 | 216.608 | $-1.2649 \times 10^9$ |
+| **8192 x 8192 x 1** | 0.63328000 | 211.941 | $-5.0596 \times 10^9$ |
+
 ## 重點結論
 
-- 相同 `M x K x 1` 規模下，T-MAC 的 GFLOPS 約為 MKL 的 **4～6 倍**（8192 規模：90.3 vs. 16.9 GFLOPS）。
-- 矩陣規模越大，T-MAC 的優勢越明顯，因建表成本可由更多輸出共同攤提。
-- MKL 於小矩陣（256）效率偏低，隨規模放大才逐漸提升。
+- 相同 `M x K x 1` 規模下，T-MAC 的 GFLOPS 均顯著高於 MKL：電腦 A 約為 **4～6 倍**（8192 規模：90.3 vs. 16.9 GFLOPS），電腦 B 約為 **5～15 倍**（8192 規模：211.9 vs. 18.4 GFLOPS）。
+- 矩陣規模越大，T-MAC 的優勢越明顯，因建表成本可由更多輸出共同攤提；此趨勢在兩台機器上一致。
+- MKL 於小矩陣（256）效率偏低，隨規模放大才逐漸提升，兩台機器皆有相同情況。
+- 電腦 B 在 T-MAC 與 MKL 上的絕對 GFLOPS 皆高於電腦 A，但 T-MAC 的相對加速倍率在電腦 B 上更明顯，顯示查表法對硬體差異的需求可能與傳統浮點運算不同，可能可以藉由更多硬體的比較得到推論。
 - T-MAC 的 GFLOPS 為「等效 FLOPS」（相當於用傳統乘加完成同樣運算所需的運算量），並非實際執行的乘法次數，因查表法本身即刻意避開多數乘法。
 - 兩者皆為單執行緒、未做深度硬體調校的結果，目的在於公平比較，非各自硬體的效能極限。
 
@@ -181,9 +265,9 @@ g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined t_mac_benchmark.cpp -o t_ma
 
 | 項目 | T-MAC | MKL |
 |---|---|---|
-| 驗證方法 | Checksum 加總 + NaN/Inf 檢查 | 已知輸入反推理論值（`C[0] = 2×K`）比對 |
-| 驗證強度 | 可檢測記憶體污染、數值爆炸等明顯異常 | 可精確驗證單點數值正確性（5% 容忍度） |
-| 限制 | 無法百分之百證明逐元素數學正確 | 僅驗證單一元素，非全陣列 |
+| 驗證方法 | 依固定合成輸入（activation 全為 `1.0f`、weight nibble 固定為 `0x1`）獨立推導理論期望值，逐元素與實際輸出比對 + NaN/Inf 檢查 | 已知輸入反推理論值（`C[0] = 2×K`）比對 |
+| 驗證強度 | 逐元素比對整個輸出陣列，可驗證數值正確性，可檢測記憶體污染、數值爆炸等異常 | 可精確驗證單點數值正確性（5% 容忍度） |
+| 限制 | 期望值僅針對本測試固定的合成輸入推導，非通用於任意weight/activation 組合 | 僅驗證單一元素，非全陣列 |
 
 ## 已知限制與注意事項
 
