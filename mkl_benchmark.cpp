@@ -39,9 +39,9 @@ int main() {
         MKL_F16 alpha = float_to_half(1.0f);   
         MKL_F16 beta  = float_to_half(0.0f);   
 
-        MKL_F16* A = (MKL_F16*)mkl_malloc(m * k * sizeof(MKL_F16), 64);
-        MKL_F16* B = (MKL_F16*)mkl_malloc(k * n * sizeof(MKL_F16), 64);
-        MKL_F16* C = (MKL_F16*)mkl_malloc(m * n * sizeof(MKL_F16), 64);
+        AlignedBuffer<MKL_F16> A(static_cast<MKL_F16*>(mkl_malloc(m * k * sizeof(MKL_F16), 64)), mkl_free);
+        AlignedBuffer<MKL_F16> B(static_cast<MKL_F16*>(mkl_malloc(k * n * sizeof(MKL_F16), 64)), mkl_free);
+        AlignedBuffer<MKL_F16> C(static_cast<MKL_F16*>(mkl_malloc(m * n * sizeof(MKL_F16), 64)), mkl_free);
 
         if (A == NULL || B == NULL || C == NULL) {
             std::cerr << "Memory allocation failed!" << std::endl;
@@ -77,10 +77,6 @@ int main() {
         std::cout << "  checksum C[0] = " << sample
                    << " (expected ~" << expected << ") "
                    << (ok ? "OK" : "MISMATCH - RESULTS SUSPECT") << std::endl;
-
-        mkl_free(A);
-        mkl_free(B);
-        mkl_free(C);
     }
 
     return 0;

@@ -212,14 +212,14 @@ int main() {
         int k_groups = k / 4;
         int num_groups = k_groups / ActK;
 
-        float* activations = (float*)_mm_malloc(k * sizeof(float), 32);
-        int8_t* qlut = (int8_t*)_mm_malloc(k_groups * ActK * 16 * sizeof(int8_t), 32);
-        uint8_t* weights = (uint8_t*)_mm_malloc(m * k_groups * 16 * sizeof(uint8_t), 32);
-        float* out_c = (float*)_mm_malloc(m * sizeof(float), 32);
-        float* scales = (float*)_mm_malloc((m / Bits) * 16 * sizeof(float), 32);
+        AlignedBuffer<float> activations(static_cast<float*>(_mm_malloc(k * sizeof(float), 32)), _mm_free);
+        AlignedBuffer<int8_t> qlut(static_cast<int8_t*>(_mm_malloc(k_groups * ActK * 16 * sizeof(int8_t), 32)), _mm_free);
+        AlignedBuffer<uint8_t> weights(static_cast<uint8_t*>(_mm_malloc(m * k_groups * 16 * sizeof(uint8_t), 32)), _mm_free);
+        AlignedBuffer<float> out_c(static_cast<float*>(_mm_malloc(m * sizeof(float), 32)), _mm_free);
+        AlignedBuffer<float> scales(static_cast<float*>(_mm_malloc((m / Bits) * 16 * sizeof(float), 32)), _mm_free);
 
-        float* lut_scales = (float*)_mm_malloc(num_groups * sizeof(float), 32);
-        float* lut_biases = (float*)_mm_malloc(num_groups * sizeof(float), 32);
+        AlignedBuffer<float> lut_scales(static_cast<float*>(_mm_malloc(num_groups * sizeof(float), 32)), _mm_free);
+        AlignedBuffer<float> lut_biases(static_cast<float*>(_mm_malloc(num_groups * sizeof(float), 32)), _mm_free);
 
         std::memset(out_c, 0, m * sizeof(float));
         std::memset(weights, 0x11, m * k_groups * 16 * sizeof(uint8_t));
@@ -261,26 +261,26 @@ int main() {
 
         bool has_nan_or_inf = false;
         double checksum = 0.0;
+        double expected_checksum = 0.0;
         double max_abs_err = 0.0;
         int mismatches = 0;
         for (int i = 0; i < m; ++i) {
+            double expected = expected_row_value(m, k, iterations, i, Bits, ActK);
+            expected_checksum += expected;
+
+            if (has_nan_or_inf) continue;
+
             if (std::isnan(out_c[i]) || std::isinf(out_c[i])) {
                 has_nan_or_inf = true;
-                break;
+                continue;
             }
             checksum += out_c[i];
 
-            double expected = expected_row_value(m, k, iterations, i, Bits, ActK);
             double abs_err = std::fabs(out_c[i] - expected);
             max_abs_err = std::max(max_abs_err, abs_err);
             if (abs_err > std::fabs(expected) * 1e-3 + 1e-3) {
                 ++mismatches;
             }
-        }
-
-        double expected_checksum = 0.0;
-        for (int i = 0; i < m; ++i) {
-            expected_checksum += expected_row_value(m, k, iterations, i, Bits, ActK);
         }
 
         std::cout << "  checksum sum(out_c) = " << checksum
@@ -294,10 +294,6 @@ int main() {
             std::cout << "  OK";
         }
         std::cout << std::endl;
-
-        _mm_free(activations); _mm_free(qlut); _mm_free(weights);
-        _mm_free(out_c); _mm_free(scales);
-        _mm_free(lut_scales); _mm_free(lut_biases);
     }
     return 0;
 }

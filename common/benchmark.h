@@ -21,3 +21,19 @@ inline void print_benchmark_row(int size, double avg_time_ms, double gflops) {
               << std::setw(15) << avg_time_ms
               << gflops << " GFLOPS" << std::endl;
 }
+
+template <typename T>
+class AlignedBuffer {
+public:
+    AlignedBuffer(T* ptr, void (*free_fn)(void*)) : ptr_(ptr), free_fn_(free_fn) {}
+    ~AlignedBuffer() { if (ptr_) free_fn_(ptr_); }
+
+    AlignedBuffer(const AlignedBuffer&) = delete;
+    AlignedBuffer& operator=(const AlignedBuffer&) = delete;
+
+    operator T*() const { return ptr_; }
+
+private:
+    T* ptr_;
+    void (*free_fn_)(void*);
+};
