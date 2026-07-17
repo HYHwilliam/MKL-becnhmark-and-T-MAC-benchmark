@@ -4,6 +4,9 @@
 t_mac_benchmark
 mkl_benchmark
 t_mac_debug
+lut_gemm_benchmark
+lut_gemm_avx2_debug
+lut_gemm_avx2_benchmark
 
 # 常見暫存檔
 *.exe
