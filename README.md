@@ -116,6 +116,8 @@ g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined t_mac_benchmark.cpp -o t_ma
 
 測試規模：`M = K = {256, 1024, 2048, 4096, 8192}`，`N = 1`，單執行緒，每組取 100 次迭代平均。
 
+![benchmark](assets/benchmark_chart_light.png)
+
 ### MKL FP16 GEMV
 
 <table>

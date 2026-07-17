@@ -174,6 +174,28 @@ inline int32_t tbl_update_avx2(int32_t m, int32_t k_groups, float_type* c, int8_
 }
 
 
+double expected_row_value(int m, int k, int iterations, int row, int Bits, int ActK) {
+    const float b = 1.0f;
+    const float abs_sum = 4.0f * b;
+    const float lut_scale = abs_sum / 127.0f;
+    const float unquantized = b - b - b - b;
+    const float lut_bias = -static_cast<float>(ActK) * (4.0f * b);
+    const int32_t quantized = static_cast<int32_t>(std::nearbyint(unquantized / lut_scale));
+
+    int k_groups = k / 4;
+    int num_groups = k_groups / ActK;
+
+    double group_sum = quantized * static_cast<double>(ActK);
+
+    bool row_gets_bias = (row % 32) < (32 / Bits);
+
+    double per_iteration = row_gets_bias
+        ? num_groups * (group_sum * static_cast<double>(lut_scale) + lut_bias)
+        : num_groups * (group_sum * static_cast<double>(lut_scale));
+
+    return per_iteration * iterations;
+}
+
 int main() {
     std::cout << "Initializing T-MAC AVX2 Benchmark (N=1 GEMV)..." << std::endl;
     std::vector<int> sizes = {256, 1024, 2048, 4096, 8192};
@@ -246,16 +268,37 @@ int main() {
 
         bool has_nan_or_inf = false;
         double checksum = 0.0;
+        double max_abs_err = 0.0;
+        int mismatches = 0;
         for (int i = 0; i < m; ++i) {
             if (std::isnan(out_c[i]) || std::isinf(out_c[i])) {
                 has_nan_or_inf = true;
                 break;
             }
             checksum += out_c[i];
+
+            double expected = expected_row_value(m, k, iterations, i, Bits, ActK);
+            double abs_err = std::fabs(out_c[i] - expected);
+            max_abs_err = std::max(max_abs_err, abs_err);
+            if (abs_err > std::fabs(expected) * 1e-3 + 1e-3) {
+                ++mismatches;
+            }
         }
-        std::cout << "  checksum sum(out_c) = " << checksum;
+
+        double expected_checksum = 0.0;
+        for (int i = 0; i < m; ++i) {
+            expected_checksum += expected_row_value(m, k, iterations, i, Bits, ActK);
+        }
+
+        std::cout << "  checksum sum(out_c) = " << checksum
+                   << " (expected " << expected_checksum << ")";
         if (has_nan_or_inf) {
             std::cout << "  [NaN/Inf detected - RESULTS INVALID]";
+        } else if (mismatches > 0) {
+            std::cout << "  [MISMATCH - " << mismatches << "/" << m
+                       << " rows off, max abs err = " << max_abs_err << "]";
+        } else {
+            std::cout << "  OK";
         }
         std::cout << std::endl;
 
