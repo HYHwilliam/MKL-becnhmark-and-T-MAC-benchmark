@@ -134,6 +134,8 @@ g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined lut_gemm_avx2_benchmark.cpp
 
 測試規模：`M = K = {256, 1024, 2048, 4096, 8192}`，`N = 1`，單執行緒，T-MAC/MKL 每組取 100 次迭代平均，LUT-GEMM 純量版因速度較慢取 10 次迭代平均。
 
+![Benchmark Chart - Intel Ultra 7 258V](assets/benchmark_chart_light.png)
+
 ### T-MAC AVX2 GEMV
 
 | Matrix Size | Latency (ms) | Performance (GFLOPS) | 正確性驗證 |

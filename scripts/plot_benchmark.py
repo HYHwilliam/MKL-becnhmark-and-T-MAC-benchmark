@@ -22,6 +22,7 @@ THEMES = {
         baseline="#c3c2b7",
         mkl="#2a78d6",
         tmac="#008300",
+        lutgemm="#c0392b",
     ),
     "dark": dict(
         surface="#1a1a19",
@@ -32,6 +33,7 @@ THEMES = {
         baseline="#383835",
         mkl="#3987e5",
         tmac="#008300",
+        lutgemm="#e0564a",
     ),
 }
 
@@ -44,6 +46,7 @@ def load_rows(csv_path):
                 size=int(r["matrix_size"]),
                 mkl_gflops=float(r["mkl_gflops"]),
                 tmac_gflops=float(r["tmac_gflops"]),
+                lutgemm_gflops=float(r["lutgemm_gflops"]),
             ))
     rows.sort(key=lambda r: r["size"])
     return rows
@@ -57,27 +60,32 @@ def render(rows, theme_name, out_path):
     labels = [f"{r['size']}×{r['size']}×1" for r in rows]
     mkl_vals = [r["mkl_gflops"] for r in rows]
     tmac_vals = [r["tmac_gflops"] for r in rows]
+    lutgemm_vals = [r["lutgemm_gflops"] for r in rows]
 
     x = range(len(rows))
-    width = 0.36
+    width = 0.26
 
     fig, ax = plt.subplots(figsize=(9, 5), dpi=200)
     fig.patch.set_facecolor(t["surface"])
     ax.set_facecolor(t["surface"])
 
     bars_mkl = ax.bar(
-        [i - width / 2 for i in x], mkl_vals, width,
+        [i - width for i in x], mkl_vals, width,
         label="MKL FP16 (cblas_hgemm)", color=t["mkl"], zorder=3,
     )
     bars_tmac = ax.bar(
-        [i + width / 2 for i in x], tmac_vals, width,
+        list(x), tmac_vals, width,
         label="T-MAC (4-bit LUT)", color=t["tmac"], zorder=3,
+    )
+    bars_lutgemm = ax.bar(
+        [i + width for i in x], lutgemm_vals, width,
+        label="LUT-GEMM CPU (AVX2, μ=8)", color=t["lutgemm"], zorder=3,
     )
 
     ax.set_ylabel("Performance (GFLOPS)", color=t["text_secondary"], fontsize=11)
     ax.set_xlabel("Matrix Size (M = K, N = 1)", color=t["text_secondary"], fontsize=11)
     ax.set_title(
-        "T-MAC (4-bit LUT) vs. MKL FP16 — Single-thread GEMV Performance",
+        "T-MAC (4-bit LUT) vs. LUT-GEMM (μ=8) vs. MKL FP16 — Single-thread GEMV Performance",
         color=t["text_primary"], fontsize=13, fontweight="bold", pad=16,
     )
     ax.set_xticks(list(x))
@@ -109,6 +117,7 @@ def render(rows, theme_name, out_path):
 
     direct_labels(bars_mkl)
     direct_labels(bars_tmac)
+    direct_labels(bars_lutgemm)
 
     legend = ax.legend(
         loc="upper left", frameon=False, fontsize=9.5,
