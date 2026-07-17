@@ -136,13 +136,13 @@ g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined lut_gemm_avx2_benchmark.cpp
 
 ### T-MAC AVX2 GEMV
 
-| Matrix Size | Latency (ms) | Performance (GFLOPS) | Checksum |
+| Matrix Size | Latency (ms) | Performance (GFLOPS) | 正確性驗證 |
 |---|---:|---:|---|
-| 256×256×1 | 0.0026 | 50.13 | 無 NaN/Inf |
-| 1024×1024×1 | 0.0316 | 66.34 | 無 NaN/Inf |
-| 2048×2048×1 | 0.1319 | 63.59 | 無 NaN/Inf |
-| 4096×4096×1 | 0.4557 | 73.64 | 無 NaN/Inf |
-| 8192×8192×1 | 1.4860 | 90.32 | 無 NaN/Inf |
+| 256×256×1 | 0.0026 | 50.13 | OK |
+| 1024×1024×1 | 0.0316 | 66.34 | OK |
+| 2048×2048×1 | 0.1319 | 63.59 | OK |
+| 4096×4096×1 | 0.4557 | 73.64 | OK |
+| 8192×8192×1 | 1.4860 | 90.32 | OK |
 
 ### LUT-GEMM CPU AVX2 版
 
@@ -177,8 +177,8 @@ g++ -g -O1 -mavx2 -mfma -fsanitize=address,undefined lut_gemm_avx2_benchmark.cpp
 
 | 項目 | T-MAC | LUT-GEMM | MKL |
 |---|---|---|---|
-| 驗證方法 | Checksum 加總 + NaN/Inf 檢查 | Checksum + 解析解比對（`output[0]=-2×K`） | 已知輸入反推理論值（`C[0]=2×K`）比對 |
-| 驗證強度 | 可檢測記憶體污染、數值爆炸等明顯異常 | 可精確驗證單點數值正確性 | 可精確驗證單點數值正確性（5% 容忍度） |
+| 驗證方法 | Checksum 加總 + 逐點解析解比對 | Checksum + 解析解比對（`output[0]=-2×K`） | 已知輸入反推理論值（`C[0]=2×K`）比對 |
+| 驗證強度 | 可精確驗證單點數值正確性 + 檢測記憶體污染、數值爆炸等異常 | 可精確驗證單點數值正確性 | 可精確驗證單點數值正確性（5% 容忍度） |
 
 ## 已知限制與注意事項
 
