@@ -92,8 +92,8 @@ g++ -O2 -mavx2 -mfma t_mac_benchmark.cpp -o t_mac_benchmark
 ### LUT-GEMM CPU Benchmark（純量版）
 
 ```bash
-g++ -O3 lut_gemm_cpu_benchmark.cpp -o lut_gemm_cpu_benchmark
-./lut_gemm_cpu_benchmark
+g++ -O3 lut_gemm_benchmark.cpp -o lut_gemm_benchmark
+./lut_gemm_benchmark
 ```
 
 > 純量版未使用任何 SIMD intrinsics，不需要額外的 `-m` 指令集旗標。
