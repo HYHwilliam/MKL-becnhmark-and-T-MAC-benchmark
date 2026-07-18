@@ -121,8 +121,7 @@ int main() {
         // Warm up
         lut_gemm_cpu(M, K, NUM_BITS, W, alpha, q_bias, input, output, lut);
 
-        // CPU 純標量(Scalar)查表極慢，測試疊代次數降低至 10 次
-        int iterations = 10;
+        int iterations = 1000;
         auto start = std::chrono::high_resolution_clock::now();
 
         for (int i = 0; i < iterations; ++i) {

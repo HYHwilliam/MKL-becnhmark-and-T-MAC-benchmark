@@ -118,7 +118,7 @@ int main() {
         // Warm up
         lut_gemm_cpu_avx2(M, K, NUM_BITS, W, alpha, q_bias, input, output, lut);
 
-        int iterations = 100; // AVX2 版速度接近 T-MAC，沿用相同疊代次數
+        int iterations = 1000;
         auto start = std::chrono::high_resolution_clock::now();
 
         for (int i = 0; i < iterations; ++i) {

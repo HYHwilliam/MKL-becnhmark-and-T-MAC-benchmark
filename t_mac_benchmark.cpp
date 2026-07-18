@@ -226,10 +226,10 @@ int main() {
         for(int i = 0; i < k; ++i) activations[i] = 1.0f;
         for(int i = 0; i < (m / Bits) * 16; ++i) scales[i] = 1.0f;
 
-        int iterations = 100;
+        int iterations = 1000;
         auto start = std::chrono::high_resolution_clock::now();
 
-        const int group_span = ActK * 4;  
+        const int group_span = ActK * 4;
 
         for (int i = 0; i < iterations; ++i) {
             for (int g = 0; g < num_groups; ++g) {

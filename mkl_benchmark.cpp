@@ -29,7 +29,7 @@ int main() {
     std::vector<int> sizes = {256, 1024, 2048, 4096, 8192};
 
     const int n = 1;
-    int iterations = 100;
+    int iterations = 1000;
 
     print_benchmark_header();
 
