@@ -7,6 +7,8 @@ t_mac_debug
 lut_gemm_benchmark
 lut_gemm_avx2_debug
 lut_gemm_avx2_benchmark
+mkl_int8_benchmark
+naive_triple_loop
 
 # 常見暫存檔
 *.exe
