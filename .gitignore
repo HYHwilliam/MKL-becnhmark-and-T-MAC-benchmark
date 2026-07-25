@@ -1,6 +1,7 @@
 # 編譯產物
 *.o
 *.out
+*.bin
 t_mac_benchmark
 mkl_benchmark
 t_mac_debug
@@ -9,6 +10,26 @@ lut_gemm_avx2_debug
 lut_gemm_avx2_benchmark
 mkl_int8_benchmark
 naive_triple_loop
+t_mac_verify
+t_mac_input
+
+data_act_256
+data_act_1024
+data_act_2048
+data_act_4096
+data_act_8192
+
+data_avx2_out_256
+data_avx2_out_1024
+data_avx2_out_2048
+data_avx2_out_4096
+data_avx2_out_8192
+
+data_W_bit_256
+data_W_bit_1024
+data_W_bit_2048
+data_W_bit_4096
+data_W_bit_8192
 
 # 常見暫存檔
 *.exe
