@@ -12,6 +12,7 @@ mkl_int8_benchmark
 naive_triple_loop
 t_mac_verify
 t_mac_input
+mkl_int8_verify
 
 data_act_256
 data_act_1024

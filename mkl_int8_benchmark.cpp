@@ -70,18 +70,18 @@ int main() {
         double gflops = compute_gflops(m, k, avg_time_ms);
         print_benchmark_row(size, avg_time_ms, gflops);
 
-        // ---- input / output ----
-        std::cout << "  input(A)[0..7] = ";
-        for (int i = 0; i < 8 && i < k; ++i) std::cout << (int)A[i] << " ";
-        std::cout << std::endl;
+        // // ---- input / output ----
+        // std::cout << "  input(A)[0..7] = ";
+        // for (int i = 0; i < 8 && i < k; ++i) std::cout << (int)A[i] << " ";
+        // std::cout << std::endl;
 
-        std::cout << "  input(B)[0..7] = ";
-        for (int i = 0; i < 8 && i < k; ++i) std::cout << (int)B[i] << " ";
-        std::cout << std::endl;
+        // std::cout << "  input(B)[0..7] = ";
+        // for (int i = 0; i < 8 && i < k; ++i) std::cout << (int)B[i] << " ";
+        // std::cout << std::endl;
 
-        std::cout << "  output[0..7]   = ";
-        for (int i = 0; i < 8 && i < m; ++i) std::cout << C[i] << " ";
-        std::cout << std::endl;
+        // std::cout << "  output[0..7]   = ";
+        // for (int i = 0; i < 8 && i < m; ++i) std::cout << C[i] << " ";
+        // std::cout << std::endl;
 
         int32_t sample = C[0];
         int32_t expected = 2 * k;

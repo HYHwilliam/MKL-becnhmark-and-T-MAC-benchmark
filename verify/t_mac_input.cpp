@@ -143,7 +143,7 @@ int main() {
     const int Bits=4, ActK=32;
     std::vector<int> sizes={256,1024,2048,4096,8192};
     std::mt19937 rng(42);
-    std::uniform_real_distribution<float> act_dist(-5.0f,5.0f);
+    std::uniform_real_distribution<float> act_dist(-0.1f,0.1f);
     std::uniform_int_distribution<int> bit_dist(0,1);
 
     std::cout << "=== t_mac_input: 產生資料、打包、跑 AVX2 kernel ===\n";
