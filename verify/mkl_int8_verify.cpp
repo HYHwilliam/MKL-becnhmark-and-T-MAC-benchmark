@@ -64,7 +64,7 @@ int main() {
         for (int i = 0; i < m * k; ++i)
             A_shifted[i] = static_cast<uint8_t>(static_cast<int>(A_signed[i]) + 128);
         for (int i = 0; i < k * n; ++i) B[i] = static_cast<uint8_t>(b_dist(rng));
-        std::fill_n(static_cast<int32_t*>(C), m * n, 0);
+        //std::fill_n(static_cast<int32_t*>(C), m * n, 0);
 
         int8_t ao = -128; // 補償 A_shifted 的 +128 位移，還原成正確的 signed 內積
 
