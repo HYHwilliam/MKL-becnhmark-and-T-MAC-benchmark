@@ -125,18 +125,17 @@ inline void tbl_update_avx2(int32_t m,int32_t k_groups,float* c,int8_t* lut,uint
     _mm_free(vec_lut);
 }
 
-// ==== OpenMP 版：外層 i 迴圈平行化，thread pool 由 OpenMP runtime 管理，不重複建立/銷毀 ====
 template <int Bits, int ActK=32>
 inline void tbl_update_avx2_omp(int32_t m,int32_t k_groups,float* c,int8_t* lut,uint8_t* a,
                                  float* scales,float* lut_scales,float* lut_biases) {
-    // vec_lut 讀取部分搬進 parallel region 內，每個 thread 各自載入自己的暫存器版本
-    // （避免共用同一份 __m128i* 造成競爭；這份資料很小，各自載入成本可忽略）
+    // 修正：malloc 移到 parallel 外面，只配置一次，所有 thread 共享讀取（唯讀，不會有寫入衝突）
+    const __m128i vec_mask=_mm_set1_epi8(0x0f);
+    __m128i* vec_lut=(__m128i*)_mm_malloc(k_groups*sizeof(__m128i),32);
+    for (int k=0;k<k_groups;k++) vec_lut[k]=_mm_loadu_si128(reinterpret_cast<__m128i*>(lut+k*16));
+
     #pragma omp parallel
     {
-        const __m128i vec_mask=_mm_set1_epi8(0x0f);
-        __m128i* vec_lut=(__m128i*)_mm_malloc(k_groups*sizeof(__m128i),32);
-        for (int k=0;k<k_groups;k++) vec_lut[k]=_mm_loadu_si128(reinterpret_cast<__m128i*>(lut+k*16));
-        SignedWideningAdder<ActK> adder;
+        SignedWideningAdder<ActK> adder; // 這個仍需每個 thread 各自一份，因為它會被寫入(累加狀態)
 
         #pragma omp for schedule(static)
         for (int i=0;i<m/2;i+=16) {
@@ -162,14 +161,13 @@ inline void tbl_update_avx2_omp(int32_t m,int32_t k_groups,float* c,int8_t* lut,
             }
             __m256 s0=_mm256_loadu_ps(scales+((i/4)/Bits)*8), s1=_mm256_loadu_ps(scales+((i/4+1)/Bits)*8);
             __m256 s2=_mm256_loadu_ps(scales+((i/4+2)/Bits)*8), s3=_mm256_loadu_ps(scales+((i/4+3)/Bits)*8);
-            // 注意：不同 i 對應不同、不重疊的輸出區段，各 thread 寫入互不衝突，無需 critical section
             _mm256_storeu_ps(c+i*2,   _mm256_fmadd_ps(c0,s0,_mm256_loadu_ps(c+i*2)));
             _mm256_storeu_ps(c+i*2+8, _mm256_fmadd_ps(c1,s1,_mm256_loadu_ps(c+i*2+8)));
             _mm256_storeu_ps(c+i*2+16,_mm256_fmadd_ps(c2,s2,_mm256_loadu_ps(c+i*2+16)));
             _mm256_storeu_ps(c+i*2+24,_mm256_fmadd_ps(c3,s3,_mm256_loadu_ps(c+i*2+24)));
         }
-        _mm_free(vec_lut);
     }
+    _mm_free(vec_lut);
 }
 
 int main() {
