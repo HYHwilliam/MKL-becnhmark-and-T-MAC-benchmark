@@ -221,7 +221,7 @@ int main() {
             //std::memset(out_c, 0, m*sizeof(float));
 
             int iterations = 20;
-            
+            if (nt == 8) iterations = 2000;
             auto start_time = std::chrono::high_resolution_clock::now();
             for (int it = 0; it < iterations; ++it) {
                 std::memset(out_c, 0, m*sizeof(float));
