@@ -86,56 +86,17 @@ inline void lut_ctor_g4_int8_avx2(int32_t act_k, int8_t* qlut, float* b, float* 
     *lut_scales=scales; *lut_biases=biases;
 }
 
-// ==== 單執行緒版：正確性對照基準（完全不變）====
-template <int Bits, int ActK=32>
-inline void tbl_update_avx2(int32_t m,int32_t k_groups,float* c,int8_t* lut,uint8_t* a,
-                            float* scales,float* lut_scales,float* lut_biases) {
-    const __m128i vec_mask=_mm_set1_epi8(0x0f);
-    __m128i* vec_lut=(__m128i*)_mm_malloc(k_groups*sizeof(__m128i),32);
-    for (int k=0;k<k_groups;k++) vec_lut[k]=_mm_loadu_si128(reinterpret_cast<__m128i*>(lut+k*16));
-    SignedWideningAdder<ActK> adder;
-    for (int i=0;i<m/2;i+=16) {
-        __m256 c0=_mm256_setzero_ps(),c1=_mm256_setzero_ps(),c2=_mm256_setzero_ps(),c3=_mm256_setzero_ps();
-        for (int kk=0;kk<k_groups;kk+=ActK) {
-            for (int k=0;k<ActK;k++) {
-                __m128i as=_mm_loadu_si128(reinterpret_cast<const __m128i*>(a+i*k_groups+(kk+k)*16));
-                __m128i bot=_mm_and_si128(as,vec_mask), top=_mm_and_si128(_mm_srli_epi16(as,4),vec_mask);
-                __m256i lut_=_mm256_set_m128i(vec_lut[kk+k],vec_lut[kk+k]);
-                __m256i av=_mm256_set_m128i(top,bot);
-                adder.push(_mm256_shuffle_epi8(lut_,av),k);
-            }
-            __m256 v00=_mm256_cvtepi32_ps(extract_low_epi16_epi32(adder.get_low()));
-            __m256 v01=_mm256_cvtepi32_ps(extract_high_epi16_epi32(adder.get_low()));
-            __m256 v10=_mm256_cvtepi32_ps(extract_low_epi16_epi32(adder.get_high()));
-            __m256 v11=_mm256_cvtepi32_ps(extract_high_epi16_epi32(adder.get_high()));
-            int gi=kk/ActK; float ls=lut_scales[gi], lb=lut_biases[gi];
-            #define F(vs,ib) ((ib)%Bits) ? _mm256_mul_ps((vs),_mm256_set1_ps(ls)) : _mm256_fmadd_ps((vs),_mm256_set1_ps(ls),_mm256_set1_ps(lb))
-            if (kk==0) { c0=F(v00,(i/4)); c1=F(v01,(i/4+1)); c2=F(v10,(i/4+2)); c3=F(v11,(i/4+3)); }
-            else { c0=_mm256_add_ps(c0,F(v00,(i/4))); c1=_mm256_add_ps(c1,F(v01,(i/4+1)));
-                   c2=_mm256_add_ps(c2,F(v10,(i/4+2))); c3=_mm256_add_ps(c3,F(v11,(i/4+3))); }
-            #undef F
-        }
-        __m256 s0=_mm256_loadu_ps(scales+((i/4)/Bits)*8), s1=_mm256_loadu_ps(scales+((i/4+1)/Bits)*8);
-        __m256 s2=_mm256_loadu_ps(scales+((i/4+2)/Bits)*8), s3=_mm256_loadu_ps(scales+((i/4+3)/Bits)*8);
-        _mm256_storeu_ps(c+i*2,   _mm256_fmadd_ps(c0,s0,_mm256_loadu_ps(c+i*2)));
-        _mm256_storeu_ps(c+i*2+8, _mm256_fmadd_ps(c1,s1,_mm256_loadu_ps(c+i*2+8)));
-        _mm256_storeu_ps(c+i*2+16,_mm256_fmadd_ps(c2,s2,_mm256_loadu_ps(c+i*2+16)));
-        _mm256_storeu_ps(c+i*2+24,_mm256_fmadd_ps(c3,s3,_mm256_loadu_ps(c+i*2+24)));
-    }
-    _mm_free(vec_lut);
-}
-
+// ==== OpenMP 版：malloc 已搬到 parallel 外面（先前驗證過的修正版） ====
 template <int Bits, int ActK=32>
 inline void tbl_update_avx2_omp(int32_t m,int32_t k_groups,float* c,int8_t* lut,uint8_t* a,
                                  float* scales,float* lut_scales,float* lut_biases) {
-    // 修正：malloc 移到 parallel 外面，只配置一次，所有 thread 共享讀取（唯讀，不會有寫入衝突）
     const __m128i vec_mask=_mm_set1_epi8(0x0f);
     __m128i* vec_lut=(__m128i*)_mm_malloc(k_groups*sizeof(__m128i),32);
     for (int k=0;k<k_groups;k++) vec_lut[k]=_mm_loadu_si128(reinterpret_cast<__m128i*>(lut+k*16));
 
     #pragma omp parallel
     {
-        SignedWideningAdder<ActK> adder; // 這個仍需每個 thread 各自一份，因為它會被寫入(累加狀態)
+        SignedWideningAdder<ActK> adder;
 
         #pragma omp for schedule(static)
         for (int i=0;i<m/2;i+=16) {
@@ -172,82 +133,67 @@ inline void tbl_update_avx2_omp(int32_t m,int32_t k_groups,float* c,int8_t* lut,
 
 int main() {
     const int Bits = 4, ActK = 32;
-    std::vector<int> sizes = {1024, 2048, 4096, 8192};
-    std::vector<int> thread_counts = {1, 2, 4, 8};
+    const int m = 8192, k = 8192;  // 固定用最大矩陣，工作量最大最容易觀察負載
+    const int nt = 8;              // 固定只測 threads=8
+
+    omp_set_num_threads(nt);
+
+    int k_groups = k/4, num_groups = k_groups/ActK, group_span = ActK*4;
 
     std::mt19937 rng(42);
     std::uniform_real_distribution<float> act_dist(-5.0f, 5.0f);
     std::uniform_int_distribution<int> byte_dist(0, 255);
 
-    std::cout << "T-MAC OpenMP 多執行緒 Benchmark\n";
-    std::cout << "------------------------------------------------------\n";
+    float* activations = (float*)_mm_malloc(k*sizeof(float),32);
+    int8_t* qlut = (int8_t*)_mm_malloc(k_groups*ActK*16*sizeof(int8_t),32);
+    uint8_t* weights = (uint8_t*)_mm_malloc(m*k_groups*16*sizeof(uint8_t),32);
+    float* out_c = (float*)_mm_malloc(m*sizeof(float),32);
+    float* scales = (float*)_mm_malloc((m/Bits)*16*sizeof(float),32);
+    float* lut_scales = (float*)_mm_malloc(num_groups*sizeof(float),32);
+    float* lut_biases = (float*)_mm_malloc(num_groups*sizeof(float),32);
 
-    for (int size : sizes) {
-        int m = size, k = size;
-        int k_groups = k/4, num_groups = k_groups/ActK, group_span = ActK*4;
+    for (int i=0;i<k;++i) activations[i]=act_dist(rng);
+    for (int i=0;i<m*k_groups*16;++i) weights[i]=(uint8_t)byte_dist(rng);
+    for (int i=0;i<(m/Bits)*16;++i) scales[i]=1.0f;
 
-        float* activations = (float*)_mm_malloc(k*sizeof(float),32);
-        int8_t* qlut = (int8_t*)_mm_malloc(k_groups*ActK*16*sizeof(int8_t),32);
-        uint8_t* weights = (uint8_t*)_mm_malloc(m*k_groups*16*sizeof(uint8_t),32);
-        float* out_c = (float*)_mm_malloc(m*sizeof(float),32);
-        float* out_c_single = (float*)_mm_malloc(m*sizeof(float),32);
-        float* scales = (float*)_mm_malloc((m/Bits)*16*sizeof(float),32);
-        float* lut_scales = (float*)_mm_malloc(num_groups*sizeof(float),32);
-        float* lut_biases = (float*)_mm_malloc(num_groups*sizeof(float),32);
-
-        for (int i=0;i<k;++i) activations[i]=act_dist(rng);
-        for (int i=0;i<m*k_groups*16;++i) weights[i]=(uint8_t)byte_dist(rng);
-        for (int i=0;i<(m/Bits)*16;++i) scales[i]=1.0f;
-
-        for (int g=0; g<num_groups; ++g) {
-            lut_scales[g]=0.0f;
-            for (int sub=0; sub<group_span/32; ++sub)
-                partial_max_g4_int8_k8(&lut_scales[g], activations+g*group_span+sub*32);
-            lut_ctor_g4_int8_avx2(group_span, qlut+g*(ActK*16), activations+g*group_span, &lut_scales[g], &lut_biases[g]);
-        }
-
-        std::memset(out_c_single, 0, m*sizeof(float));
-        tbl_update_avx2<Bits, ActK>(m, k_groups, out_c_single, qlut, weights, scales, lut_scales, lut_biases);
-
-        std::cout << "\n=== Matrix Size " << m << "x" << k << " ===\n";
-
-        for (int nt : thread_counts) {
-            omp_set_num_threads(nt);
-
-            for (int warmup = 0; warmup < 5; ++warmup) {
-                std::memset(out_c, 0, m*sizeof(float));
-                tbl_update_avx2_omp<Bits, ActK>(m, k_groups, out_c, qlut, weights, scales, lut_scales, lut_biases);
-            }
-            //std::memset(out_c, 0, m*sizeof(float));
-
-            int iterations = 20;
-            
-            auto start_time = std::chrono::high_resolution_clock::now();
-            for (int it = 0; it < iterations; ++it) {
-                std::memset(out_c, 0, m*sizeof(float));
-                tbl_update_avx2_omp<Bits, ActK>(m, k_groups, out_c, qlut, weights, scales, lut_scales, lut_biases);
-            }
-            auto end_time = std::chrono::high_resolution_clock::now();
-            double avg_ms = std::chrono::duration<double,std::milli>(end_time-start_time).count()/iterations;
-            double gflops = (2.0*m*k)/(avg_ms/1000.0)/1e9;
-
-            int mismatches = 0;
-            double max_err = 0.0;
-            for (int i = 0; i < m; ++i) {
-                double err = std::fabs(out_c[i] - out_c_single[i]);
-                max_err = std::max(max_err, err);
-                if (err > 1e-4 * std::fabs(out_c_single[i]) + 1e-4) ++mismatches;
-            }
-
-            std::cout << "  threads=" << nt << "  latency=" << avg_ms << "ms  "
-                       << gflops << " GFLOPS  "
-                       << (mismatches==0 ? "OK" : ("MISMATCH x"+std::to_string(mismatches)))
-                       << "  max_err=" << max_err << "\n";
-        }
-
-        _mm_free(activations); _mm_free(qlut); _mm_free(weights);
-        _mm_free(out_c); _mm_free(out_c_single); _mm_free(scales);
-        _mm_free(lut_scales); _mm_free(lut_biases);
+    for (int g=0; g<num_groups; ++g) {
+        lut_scales[g]=0.0f;
+        for (int sub=0; sub<group_span/32; ++sub)
+            partial_max_g4_int8_k8(&lut_scales[g], activations+g*group_span+sub*32);
+        lut_ctor_g4_int8_avx2(group_span, qlut+g*(ActK*16), activations+g*group_span, &lut_scales[g], &lut_biases[g]);
     }
+
+    std::cout << "=== T-MAC threads=8 壓力測試（8192x8192，持續運行方便 htop 觀察）===\n";
+    std::cout << "OpenMP 執行緒數: " << nt << "\n";
+    std::cout << "開始運行，請立刻切到另一個終端機執行 htop 觀察核心負載...\n";
+    std::cout << "此測試將持續運行約 10-15 秒\n\n";
+
+    // 拉高到 3000 次迭代，讓程式持續運行足夠久，方便你切換視窗用 htop 觀察
+    int iterations = 3000;
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    for (int it = 0; it < iterations; ++it) {
+        std::memset(out_c, 0, m*sizeof(float));
+        tbl_update_avx2_omp<Bits, ActK>(m, k_groups, out_c, qlut, weights, scales, lut_scales, lut_biases);
+
+        // 每 200 次印一次進度，讓你知道還在跑，且不會洗版
+        if ((it + 1) % 200 == 0) {
+            std::cout << "  進度: " << (it + 1) << " / " << iterations << "\n";
+        }
+    }
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    double total_ms = std::chrono::duration<double,std::milli>(end_time-start_time).count();
+    double avg_ms = total_ms / iterations;
+    double gflops = (2.0*m*k)/(avg_ms/1000.0)/1e9;
+
+    std::cout << "\n=== 結果 ===\n";
+    std::cout << "總運行時間: " << (total_ms/1000.0) << " 秒\n";
+    std::cout << "平均延遲: " << avg_ms << " ms\n";
+    std::cout << "效能: " << gflops << " GFLOPS\n";
+    std::cout << "output[0..3] = " << out_c[0] << " " << out_c[1] << " " << out_c[2] << " " << out_c[3] << "\n";
+
+    _mm_free(activations); _mm_free(qlut); _mm_free(weights);
+    _mm_free(out_c); _mm_free(scales); _mm_free(lut_scales); _mm_free(lut_biases);
     return 0;
 }

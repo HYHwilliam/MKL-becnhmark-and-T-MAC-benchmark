@@ -100,7 +100,26 @@
 
 ---
 
-## 4. 系統驗證工作流（Workflow）
+## 4. 編譯與執行指令
+
+請依序編譯並執行以下程式碼，以確保資料流的依賴關係（需先產生 `.bin` 檔案才能進行後續驗證）：
+
+```bash
+# 1. t_mac_input.cpp：資料生成、打包、AVX2 執行，匯出 .bin 檔案
+g++ -O2 -mavx2 -mfma t_mac_input.cpp -o t_mac_input
+./t_mac_input
+
+# 2. naive_triple_loop.cpp：讀取 .bin，純三層迴圈 ground truth 比對
+g++ -O2 naive_triple_loop.cpp -o naive_triple_loop
+./naive_triple_loop
+
+# 3. t_mac_verify.cpp：AVX2 vs 純量 foolproof 模擬器，任意輸入正確性驗證
+g++ -O2 -mavx2 -mfma t_mac_verify.cpp -o t_mac_verify
+./t_mac_verify
+```
+---
+
+## 5. 系統驗證工作流（Workflow）
 
 ```mermaid
 graph TD
@@ -113,7 +132,7 @@ graph TD
     F -->|指令級模擬| G[確認 SIMD 翻譯無誤]
 ```
 
-## 5. 結論：
+## 6. 結論：
 這三份程式碼構成兩層獨立、互補的驗證：
 - `t_mac_verify.cpp` 證明了：這份 AVX2 kernel 沒有 SIMD 指令誤用（shuffle/fmadd/暫存器搬移皆正確）。
 

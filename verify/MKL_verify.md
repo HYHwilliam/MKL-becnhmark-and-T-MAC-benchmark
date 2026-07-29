@@ -86,7 +86,31 @@ $$\text{unsigned}(x) + \text{ao} = (x + 128) + (-128) = x$$
 
 ---
 
-## 3. 系統驗證工作流（Workflow）
+## 3. 編譯與執行指令 (MKL INT8 驗證)
+
+執行 MKL Benchmark 之前，必須先載入 Intel oneAPI 的環境變數並連結相關函式庫。請在 `verify/` 資料夾下執行：
+
+```bash
+# 需先設定 MKL 環境 (依據您的安裝路徑可能有所不同)
+source /opt/intel/oneapi/setvars.sh
+export LD_LIBRARY_PATH=${MKLROOT}/lib/intel64:$LD_LIBRARY_PATH
+
+# mkl_int8_a0_positive.cpp：原始呼叫方式，全正數測試
+g++ -O2 -I.. -I${MKLROOT}/include mkl_int8_a0_positive.cpp \
+    -L${MKLROOT}/lib/intel64 \
+    -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl \
+    -o mkl_int8_a0_positive
+./mkl_int8_a0_positive
+
+# mkl_int8_verify.cpp：隨機含負數輸入，Offset 修正版
+g++ -O2 -I.. -I${MKLROOT}/include mkl_int8_verify.cpp \
+    -L${MKLROOT}/lib/intel64 \
+    -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl \
+    -o mkl_int8_verify
+./mkl_int8_verify
+```
+
+## 4. 系統驗證工作流（Workflow）
 
 ```mermaid
 graph TD
@@ -98,6 +122,6 @@ graph TD
     F -->|套用至完整 Benchmark| G[全部尺寸 mismatches=0]
 ```
 
-## 4. 結論
+## 5. 結論
 - mkl_int8_a0_positive.cpp 證明了：在全正數測試資料下，ao=0 的呼叫方式數值正確，但這個驗證範圍不足以代表一般情況（尤其是 LLM 權重必然包含負值的真實推論場景）。
 - mkl_int8_verify.cpp 證明了：透過隨機含負數輸入與最小尺寸孤立測試，可以定位出 API 在特定呼叫方式下的資料型別解讀問題，並透過 offset 補償法修正，使結果在所有測試尺寸下與純量 ground truth 逐元素完全相等。
