@@ -17,6 +17,9 @@ t_mac_pthread_benchmark
 t_mac_openmp_benchmark
 t_mac_thread8_stress
 
+lut_gemm_pthread_benchmark
+lut_gemm_openmp_benchmark
+
 mkl_int8_verify
 mkl_int8_a0_positive
 
