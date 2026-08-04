@@ -13,6 +13,10 @@ naive_triple_loop
 t_mac_verify
 t_mac_input
 
+verify_tmac_gemm
+t_mac_gemm_w234
+mkl_fp16_gemm
+
 t_mac_pthread_benchmark
 t_mac_openmp_benchmark
 t_mac_thread8_stress
@@ -44,3 +48,14 @@ data_W_bit_8192
 # 常見暫存檔
 *.exe
 .vscode/
+
+*.log
+tmac_gemm_benchmark
+mkl_gemm_benchmark
+
+# Temporary comparison output
+benchmark_comparison.csv
+
+# Python cache
+__pycache__/
+*.py[cod]
