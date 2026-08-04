@@ -15,6 +15,7 @@ t_mac_input
 
 t_mac_pthread_benchmark
 t_mac_openmp_benchmark
+t_mac_thread8_stress
 
 mkl_int8_verify
 mkl_int8_a0_positive
