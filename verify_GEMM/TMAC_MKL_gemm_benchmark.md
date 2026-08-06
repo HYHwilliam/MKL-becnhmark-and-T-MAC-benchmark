@@ -226,6 +226,8 @@ max_bound_ratio = 實際誤差 / 理論容忍上界
 | W4 | 12 | 45,568 | 0 | 0 | 0 | 16 | 0.208138 | PASS |
 | **Total** | **36** | **136,704** | **0** | **0** | **0** | **40** | **0.208138** | **PASS** |
 
+> <mark><strong>驗證結果：W2、W3、W4 全部 PASS；136,704 個 output 與 40 組 schedule candidate 均無 mismatch。</strong></mark>
+
 ### 結果分析
 
 * 36 組數值案例、136,704 個 output 全部通過，沒有 mismatch。
@@ -304,6 +306,8 @@ FLOPs < 1e10  ：7 samples
 | W4 | 4 | 80 | 59/80 | 1.200× | 1.675× |
 | W4 | 8 | 80 | 53/80 | 1.507× | 1.800× |
 
+> <mark><strong>整體效能順序為 W2A16 ＞ W3A16 ＞ W4A16；其中 W2A16 在所有 thread budget 下的 geomean 均高於 oneMKL。</strong></mark>
+
 整體結果顯示：
 
 * W2A16 效能最穩定，所有 thread budget 的 geomean 均高於 oneMKL；2 threads 為 2.841×，4 threads 為 2.739×。
@@ -328,6 +332,8 @@ FLOPs < 1e10  ：7 samples
 | W4 | 2 | 2.462× | 6.295× | 2.070× | 0.689× | 0.342× |
 | W4 | 4 | 1.231× | 6.286× | 2.534× | 1.080× | 0.623× |
 | W4 | 8 | 1.079× | 6.415× | 3.262× | 1.159× | 0.722× |
+
+> <mark><strong>最有利的 batch 範圍為 N=1～8；當 N 增加至 128～512，oneMKL 的 dense GEMM 資料重用優勢逐步增加。</strong></mark>
 
 主要趨勢：
 
@@ -371,6 +377,8 @@ W2 在各 category 與各 thread budget 下均具有整體優勢。W3 單執行�
 | W2 | 2.024× | 2.267× | 1.985× | 1.126× | 1.309× | 1.247× |
 | W3 | 2.132× | 2.540× | 2.200× | 1.205× | 1.337× | 1.228× |
 | W4 | 2.326× | 2.909× | 2.905× | 1.162× | 1.301× | 1.209× |
+
+> <mark><strong>整體較穩定的平行區間為 2～4 threads；8-thread budget 不保證所有 shape 都能持續加速。</strong></mark>
 
 結果顯示：
 
@@ -510,7 +518,64 @@ graph TD
 
 ---
 
-## 9. 結論
+## 9. 結果解讀與使用限制
+
+> <mark><strong>本報告的數據應解讀為：完成離線準備與調優後的 GEMM operator latency，而不是完整 LLM 推論速度。</strong></mark>
+
+### 9.1 Thread Budget 與實際執行緒數
+
+報告中的 `threads` 代表允許使用的最大執行緒數，實際執行量由可平行的 N tile 或 M tile 數量決定：
+
+```text
+active_threads = min(requested_threads, parallel_work_items)
+```
+
+960 組案例中有 47 組的 `active_threads` 少於 requested threads，因此第 6.4 節應解讀為 **thread budget scaling**。若要嚴格比較固定執行緒數，應另外篩選：
+
+```text
+active_threads == requested_threads
+```
+
+### 9.2 計時範圍
+
+正式 T-MAC latency 為：
+
+```text
+total_ms = preprocess_ms + kernel_ms
+```
+
+其中包含 FP16 Activation LUT 建立、查表、累加與 output reduction；不包含離線 weight packing、oneMKL 權重解量化、記憶體配置與 `tuning_ms`。因此結果代表 schedule 已選定後的重複執行效能，而不是第一次執行的總等待時間。
+
+### 9.3 統計值與穩定性
+
+- Median：代表典型 latency。
+- P90：反映較差情況下的延遲與排程波動。
+- Geomean：適合彙整不同矩陣尺寸的整體 speedup。
+- Faster cases：顯示多少個別案例快於 oneMKL。
+
+判讀時應同時觀察這四項。若 P90 明顯高於 median，代表該 shape 或 thread 設定較容易受到 WSL、OpenMP、CPU frequency、異質核心或背景程序影響。
+
+### 9.4 比較公平性與結果邊界
+
+T-MAC 與 oneMKL 使用相同的 FP16 Activation、low-bit `qweights` 與 FP16 group scale；oneMKL 的權重會在離線階段解量化為 dense FP16，再執行 `cblas_hgemm`。
+
+因此本測試比較的是：
+
+> 直接使用低位元 LUT GEMM，與先解量化成 dense FP16 再使用 oneMKL GEMM 的 operator latency。
+
+T-MAC GFLOPS 使用 `2 × M × K × N / latency` 計算，是 logical equivalent GFLOPS，不代表實際 FP16 FMA 指令數。結果也不能直接換算成完整模型的 tokens/s。
+
+### 9.5 與官方實作及測試環境的關係
+
+本實作對齊官方的 FP16 Activation、W2/W3/W4 bit-plane、INT8 LUT、`bm/bn/kfactor`、weight permutation 與外層 tile 平行化方向；但不是官方 TVM／AutoTVM／LLVM generated kernel 的逐指令複製。
+
+效能也會受到 CPU、Cache、memory bandwidth、OpenMP runtime、WSL、電源模式與 oneMKL 版本影響。移植至其他平台時，應重新執行 verifier、autotune 與 benchmark，不應直接沿用本報告的最佳 schedule 或 speedup。
+
+> <mark><strong>最可靠的結果範圍：低 bit-width、N=1～32 與適當 thread budget 是 T-MAC 最有利的使用情境；W2A16 的優勢最穩定。</strong></mark>
+
+---
+
+## 10. 結論
 
 本專案完成 T-MAC W2A16、W3A16、W4A16 的 standalone AVX2/F16C/OpenMP GEMM 實作，並對齊官方低位元 LUT compute、bit-plane decomposition、`bm/bn/kfactor` schedule candidate、離線 weight permutation 與多執行緒外層 tile 分派。
 
@@ -532,4 +597,46 @@ graph TD
 
 因此可得到以下結論：
 
-> T-MAC 在真正 FP16 Activation 與低位元權重下，能透過 INT8 LUT、bit-wise accumulation 與官方風格 tiling 降低 mixed-precision GEMM 成本。效能隨 bit-width 增加而下降，W2A16 的優勢最穩定；在 Decode、小 batch 與適當多執行緒設定下，T-MAC 整體可明顯優於 oneMKL FP16 GEMM，而大 batch 與高 bit-width 則更依賴矩陣 shape、CPU 架構與 schedule 選擇。
+> <mark><strong>最終結論：T-MAC 最適合低 bit-width、Decode／小 batch 與適當的 2～4 thread budget，其中 W2A16 的效能優勢最穩定。</strong></mark>
+>
+> 在真正 FP16 Activation 與低位元權重下，T-MAC 能透過 INT8 LUT、bit-wise accumulation 與官方風格 tiling 降低 mixed-precision GEMM 成本；大 batch 與高 bit-width 的效能則更依賴矩陣 shape、CPU 架構與 schedule 選擇。
+
+
+---
+
+# Appendix A：Benchmark Configuration
+
+為了確保 benchmark 具有可重現性（Reproducibility），本研究所有 T-MAC 與 oneMKL 測試皆使用相同硬體環境、相同矩陣尺寸與相同測試流程。
+
+| 項目 | 設定 |
+| :--- | :--- |
+| CPU | Intel Core Ultra 7 258V |
+| ISA | AVX2、FMA、F16C |
+| OS | Ubuntu 24.04 (WSL2) |
+| Compiler | g++ (`-O3 -march=native -mavx2 -mfma -mf16c`) |
+| BLAS | Intel oneMKL (`cblas_hgemm`) |
+| Activation | FP16 |
+| Weight | W2A16、W3A16、W4A16 |
+| Thread Budget | 1、2、4、8 |
+| Random Seed | 42 |
+| Metrics | Latency、Equivalent GFLOPS、Speedup、Median、Geometric Mean |
+
+## Benchmark 原則
+
+- T-MAC 與 oneMKL 使用相同 M、K、N。
+- 使用相同 FP16 Activation。
+- oneMKL 使用由相同低位元權重還原之 FP16 Dense Weight。
+- Latency 不包含 Packing、Auto-tuning、記憶體配置等離線成本。
+- Speedup = MKL Latency / T-MAC Latency。
+
+## Benchmark 解讀
+
+建議依序閱讀：
+
+1. Independent Verification 是否全部 PASS。
+2. Latency（主要比較依據）。
+3. Speedup。
+4. Geometric Mean（整體趨勢）。
+5. Median 與 P90（穩定性）。
+
+Equivalent GFLOPS 僅作為吞吐量指標，不代表實際執行的浮點運算數。
