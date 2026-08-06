@@ -1,13 +1,11 @@
-# T-MAC W2/W3/W4 正確性驗證與 oneMKL FP16 GEMM 效能比較報告
+# T-MAC W2/W3/W4A16 正確性驗證與 oneMKL FP16 GEMM 多執行緒效能比較報告
 
-本專案旨在實作並驗證 T-MAC 的低位元查表矩陣乘法，並比較 T-MAC W2A16、W3A16、W4A16 與 oneMKL FP16 GEMM 在相同矩陣尺寸及單執行緒環境下的效能差異。
+本專案實作 T-MAC 的低位元查表矩陣乘法，使用真正的 FP16 Activation、AVX2/F16C、INT8 Lookup Table、官方 `bm/bn/kfactor` 候選排程與 OpenMP 多執行緒，並與 oneMKL FP16 GEMM 比較相同矩陣尺寸下的延遲差異。
 
-為避免高效能核心與驗證程式共用相同中間資料或位址公式，造成「兩邊一起算錯卻仍通過」的同源錯誤風險，本專案將驗證拆成兩個層次：
+驗證與效能測試分成兩條獨立流程：
 
-1. `verify_tmac_gemm.cpp`：AVX2 LUT kernel 與純量 LUT 模擬器的 Bitwise 驗證。
-2. `verify_tmac_gemm_independent.cpp`：T-MAC packed/LUT GEMM 與原始 `W_bit` 三層迴圈 Ground Truth 的獨立數學驗證。
-
-正確性確認後，再使用 `t_mac_gemm_w234.cpp`、`mkl_fp16_gemm.cpp` 與 `compare_tmac_mkl.py` 完成完整效能比較。
+1. `verify_tmac_gemm_independent.cpp`：以直接量化矩陣乘法 Ground Truth 驗證 packed weight、LUT、bit-plane reduction、schedule candidate、執行緒一致性及 optimized/reference kernel。
+2. `t_mac_gemm_w234.cpp`、`mkl_fp16_gemm_mt.cpp` 與 `compare_tmac_mkl_mt.py`：比較 W2A16、W3A16、W4A16 與 oneMKL W16A16 在 1、2、4、8 thread budget 下的效能。
 
 ---
 
@@ -15,395 +13,243 @@
 
 ### 定位
 
-建立一套同時涵蓋「指令級正確性」、「數學等價性」與「效能比較」的 T-MAC GEMM 驗證流程。
+建立一套同時涵蓋「真實 FP16 輸入」、「官方風格資料排列與 tiling」、「獨立數學驗證」及「單／多執行緒效能比較」的 T-MAC GEMM 測試流程。
 
 ### 核心程式
 
 | 程式 | 定位 | 驗證或測試內容 |
 | :--- | :--- | :--- |
-| `verify_tmac_gemm.cpp` | 指令級驗證 | AVX2 LUT kernel 對 Scalar LUT Golden Reference |
-| `verify_tmac_gemm_independent.cpp` | 獨立數學驗證 | Packed/LUT T-MAC 對原始 `W_bit` 三層迴圈 |
-| `t_mac_gemm_w234.cpp` | T-MAC 效能測試 | W2A16、W3A16、W4A16 latency 與等效 GFLOPS |
-| `mkl_fp16_gemm.cpp` | Dense baseline | oneMKL W16A16 FP16 GEMM latency 與 GFLOPS |
-| `compare_tmac_mkl.py` | 自動比較工具 | 配對相同 M/K/N，計算 speedup 並輸出 CSV |
+| `tmac_official_avx2.hpp` | T-MAC 核心 | FP16、LUT、weight packing、scale packing、reference kernel、register-blocked AVX2 kernel 與 OpenMP |
+| `verify_tmac_gemm_independent.cpp` | 獨立數學驗證 | T-MAC 對直接量化矩陣乘法 Ground Truth，並驗證 packing、schedule 與 thread determinism |
+| `t_mac_gemm_w234.cpp` | T-MAC 效能測試 | W2A16、W3A16、W4A16，官方候選 schedule、offline autotune、median latency 與 P90 |
+| `mkl_fp16_gemm_mt.cpp` | Dense baseline | oneMKL `cblas_hgemm` W16A16 FP16 GEMM |
+| `compare_tmac_mkl_mt.py` | 自動比較工具 | 配對相同 bit、M、K、N、threads，計算 speedup 並輸出 CSV |
 
 ### 測試精度設定
 
-| 實作 | 權重格式 | Activation | 主要用途 |
-| :--- | :---: | :---: | :--- |
-| T-MAC W2A16 | 2-bit-plane 分組 | FP32 建立 INT8 LUT | 低位元查表 GEMM |
-| T-MAC W3A16 | 3-bit-plane 分組 | FP32 建立 INT8 LUT | 低位元查表 GEMM |
-| T-MAC W4A16 | 4-bit-plane 分組 | FP32 建立 INT8 LUT | 低位元查表 GEMM |
-| oneMKL W16A16 | Dense FP16 | FP16 | 標準 dense GEMM baseline |
+| 實作 | 權重格式 | Activation | Weight Scale | Output |
+| :--- | :---: | :---: | :---: | :---: |
+| T-MAC W2A16 | Signed 2-bit | FP16 | FP16 / group 128 | FP16 |
+| T-MAC W3A16 | Signed 3-bit | FP16 | FP16 / group 128 | FP16 |
+| T-MAC W4A16 | Signed 4-bit | FP16 | FP16 / group 128 | FP16 |
+| oneMKL W16A16 | Dense FP16 | FP16 | 已合併至 FP16 weight | FP16 |
 
-> T-MAC 的 GFLOPS 使用 `2 × M × K × N` 換算，代表「等效 GEMM throughput」，不等於處理器實際執行的 FP16 浮點指令數。因此跨實作比較時，應優先觀察 latency 與 latency speedup。
+T-MAC 與 oneMKL 由相同 deterministic seed 產生同一組 `qweights`、FP16 Activation 與 FP16 group scale。oneMKL baseline 先將低位元權重依 group scale 解量化為 FP16 dense weight，再執行 `cblas_hgemm`。
+
+> T-MAC 的 GFLOPS 以 `2 × M × K × N` 換算，代表完成相同 logical GEMM 的等效 throughput，不等於處理器實際執行的 FP16 FMA 數量。跨實作比較時應優先觀察 latency 與 speedup。
 
 ---
 
 ## 2. T-MAC GEMM 核心設計
 
-### 定位
-
-`t_mac_gemm_w234.cpp` 將 W2、W3、W4 合併成同一套 template kernel，確保三種 bit-width 使用相同的測試尺寸、資料生成、計時方式與輸出格式。
-
-### 核心流程
-
-1. 為每個 batch activation 建立獨立 LUT。
-2. 將 LUT 動態量化為 INT8。
-3. 使用 `_mm256_shuffle_epi8` 進行暫存器查表。
-4. 使用 INT16 widening accumulation 聚合查表結果。
-5. 使用 `_mm256_fmadd_ps` 套用 LUT scale、bias 與 weight scale。
-6. 依 `M_BLOCK=512` 進行 M 維度 tiling。
-7. 以 global bit-plane index 處理 W3 跨 tile phase。
-
-### Global Bit-plane 修正
-
-原本只使用 tile 內部索引：
-
-```cpp
-(i / 4) % Bits
-```
-
-在 W3 且 `M_BLOCK=512` 時會產生問題：
+### 矩陣語意
 
 ```text
-512 / 8 = 64
-64 mod 3 = 1
+Activation A : [N, K]
+Quantized W  : [M, K]
+Output C     : [N, M]
 ```
 
-第二個 tile 的 bit-plane phase 應從 1 開始，不能重新從 0 開始。因此新版使用：
+`M` 為 logical output channel。每個權重先拆成 `Bits` 個 bit-plane，內部 expanded channel 為：
 
 ```cpp
-const int bit_plane_base = m_start / 8;
-
-const int ib0 = bit_plane_base + i / 4;
-const int ib1 = ib0 + 1;
-const int ib2 = ib0 + 2;
-const int ib3 = ib0 + 3;
+M_expanded = M * Bits;
 ```
 
-此修正同時適用於 W2、W3、W4，使 kernel 不再依賴 tile 大小剛好對齊 bit-width。
+完成 LUT accumulation 後，再將 bit-plane 合併為真正的 `C[N,M]`。
+
+### Signed quantized weight
+
+```cpp
+q_signed = q_uint - (1 << (Bits - 1));
+```
+
+| 格式 | q_uint | q_signed |
+| :---: | :---: | :---: |
+| W2 | 0～3 | -2～1 |
+| W3 | 0～7 | -4～3 |
+| W4 | 0～15 | -8～7 |
+
+### FP16 Activation 與 LUT
+
+Activation 以 IEEE FP16 bit pattern 儲存。AVX2 kernel 使用 F16C 將 FP16 轉為 FP32 register，再建立 INT8 LUT：
+
+```text
+FP16 Activation
+→ F16C 轉為 FP32
+→ g=4 的 16-entry LUT
+→ LUT 動態量化為 INT8
+→ PSHUFB 查表
+→ INT16 widening accumulation
+→ FP32 scale/bias 與 bit-plane reduction
+→ FP16 output
+```
+
+主要參數：
+
+```text
+g = 4
+act_group_size = 64
+weight_group_size = 128
+LUT dtype = INT8
+Activation / weight scale / output = FP16
+```
+
+### Bit-plane 合併與 bias
+
+令 `s_i = 2b_i - 1`，則：
+
+```text
+q_signed = Σ 2^(i-1)s_i - 0.5
+A·q_signed = Σ 2^(i-1)(A·s_i) - 0.5ΣA
+```
+
+各 bit-plane 的合併係數為：
+
+| Plane | α |
+| :---: | :---: |
+| bit 0 | 0.5 |
+| bit 1 | 1.0 |
+| bit 2 | 2.0 |
+| bit 3 | 4.0 |
+
+`lut_bias=-ΣA` 僅加入 bit 0，再乘上 `alpha0=0.5`，得到 signed quantized weight 所需的 `-0.5ΣA`。
+
+### 官方風格 Tiling 與 Weight Permutation
+
+實作使用官方 `qgemm.py` 的 schedule candidate 概念：
+
+```text
+W2/W4 bm：128、256、512、1024
+W3 bm：192、384、768
+bn：8、16、32、64
+kfactor：16
+```
+
+權重在計算前依 `bm/kfactor/SIMD/bit-plane` 順序離線 permutation。執行時以 `bm`、`bn` 切分 M/N，K 軸以 `kfactor × g = 64` 為 lookup reduction 單位。
+
+核心 micro-kernel 每次處理 32 個 expanded outputs，使用 4 個 `__m256` accumulator 將完整 K reduction 保留在 register，所有 K 完成後才寫回並執行 bit-plane reduction。
+
+### 多執行緒分派
+
+多執行緒由 OpenMP 平行化外層 N tile 或 M tile。當可用 tile 數少於要求的 thread 數時：
+
+```text
+active_threads = min(requested_threads, parallel_work_items)
+```
+
+因此 `threads=8` 表示最多允許 8 個執行緒。960 組配對結果中有 47 組因 tile 數量限制使用 2 或 4 個 active threads；其餘 913 組使用完整要求數量。比較腳本會對這些案例輸出 Warning，避免將 requested threads 與 active threads 混為一談。
 
 ---
 
-## 3. 第一層驗證：AVX2 與 Scalar LUT Bitwise 驗證
+## 3. 正確性驗證
 
-### 定位
+### 獨立資料路徑
 
-`verify_tmac_gemm.cpp` 用來確認 AVX2 kernel 是否忠實執行同一套 LUT 定義與位址映射。
-
-### 驗證方法
-
-* AVX2 與 Scalar 版本使用相同 packed weights、qlut、lut scale 與 lut bias。
-* Scalar Golden Reference 以純量陣列模擬 AVX2 lane。
-* 使用 `std::fma()` 模擬 `_mm256_fmadd_ps` 的一次性捨入。
-* `kk==0` 時直接覆蓋 accumulator，後續 group 才進行加法累積。
-* 編譯加入 `-ffp-contract=off`，避免編譯器把其他乘加自動融合。
-* 比較每一個 FP32 output 的 32-bit pattern。
-
-### 驗證結果
-
-W2、W3、W4 全部達成：
+`verify_tmac_gemm_independent.cpp` 使用同一組量化權重與 FP16 Activation 建立兩條獨立路徑：
 
 ```text
-BITWISE PASS
+qweights[M,K]
+   ├── bit-plane decomposition
+   │   → official-style packing
+   │   → INT8 LUT
+   │   → AVX2 register-blocked kernel
+   │   → bit-plane reduction
+   │   → T-MAC output[N,M]
+   │
+   └── q_signed = q_uint - 2^(Bits-1)
+       → 直接 N×M×K 三層迴圈
+       → FP16 Ground Truth[N,M]
 ```
 
-### 這份驗證證明了什麼
+Ground Truth 不使用 packed weight、LUT、layout index、LUT scale/bias 或 reduction 函式，因此能降低兩條路徑共同使用相同錯誤邏輯的風險。
 
-* `_mm256_shuffle_epi8` 查表行為正確。
-* 高低 nibble 拆分正確。
-* INT8 → INT16 → INT32 widening accumulation 正確。
-* `_mm256_fmadd_ps`、乘法與加法順序正確。
-* M tiling、weight offset、output offset 正確。
-* W3 global bit-plane phase 已正確套用。
-* Scalar LUT 與 AVX2 LUT kernel 在 bit pattern 上完全一致。
+### 驗證內容
 
-### 驗證限制
-
-這一層仍共用：
+* 真實 FP16 Activation、FP16 group scale 與 FP16 output。
+* 一般隨機輸入、零 Activation、正負固定 Activation、交錯極值權重與不同 scale。
+* `packing=PASS`：packed weight 可逐 bit 還原原始權重。
+* `thread_mismatches=0`：不同執行緒數輸出一致。
+* `kernel_mismatches=0`：optimized register-blocked kernel 與 reference kernel 輸出一致。
+* 所有官方有效 `bm/bn/kfactor` candidate 均執行 schedule regression。
+* 依實際量化 LUT residual、FP16 scale/bias rounding 與 FP16 output rounding 建立誤差上界。
 
 ```text
-qlut_all
-lut_scales_all
-lut_biases_all
+max_bound_ratio = 實際誤差 / 理論容忍上界
 ```
 
-因此它主要證明「AVX2 kernel 與 Scalar LUT 模擬器一致」，不能單獨證明 LUT 建表、權重打包及查表公式在數學上等價於原始矩陣乘法。
+只要 `max_bound_ratio < 1`，代表誤差未超過預估量化與 FP16 rounding 上界。
 
 ---
 
-## 4. 第二層驗證：獨立三層迴圈 GEMM Ground Truth
+## 4. 獨立 GEMM 驗證結果
 
-### 定位
+### 4.1 W2A16
 
-`verify_tmac_gemm_independent.cpp` 不使用 qlut 作為 Golden Reference，而是從原始未壓縮的 `W_bit` 出發，分成兩條獨立資料路徑：
+| Shape | Mismatches | Max Abs Error | Mean Abs Error | Max Bound Ratio |
+| :--- |  :---: | ---: | ---: | ---: |
+| `256×256×1` | 0/256 | 0.0185547 | 0.0037440 | 0.175277 |
+| `256×256×3` | 0/768 | 0.0170898 | 0.0040253 | 0.186119 |
+| `512×512×8` | 0/4096 | 0.0317383 | 0.0061373 | 0.165129 |
+| `1024×1024×16` | 0/16384 | 0.0527344 | 0.0089259 | 0.138297 |
+| `1024×2048×3` | 0/3072 | 0.0664062 | 0.0128244 | 0.087222 |
+| `2048×1024×8` | 0/16384 | 0.0502930 | 0.0088625 | 0.143781 |
 
-```text
-原始 W_bit
-   ├── pack_tmac_weights → T-MAC packed/LUT GEMM
-   └── N × M × K 純三層迴圈 → Independent Ground Truth
-```
+### 4.2 W3A16
 
-此設計用來排除兩邊共用相同 LUT 或 packed layout 錯誤的風險。
+| Shape | Mismatches | Max Abs Error | Mean Abs Error | Max Bound Ratio |
+| :--- |  :---: | ---: | ---: | ---: |
+| `256×256×1` | 0/256 | 0.0371094 | 0.0076674 | 0.191820 |
+| `256×256×3` | 0/768 | 0.0468750 | 0.0087150 | 0.194412 |
+| `512×512×8` | 0/4096 | 0.0639648 | 0.0125061 | 0.146320 |
+| `1024×1024×16` | 0/16384 | 0.1035156 | 0.0185057 | 0.130169 |
+| `1024×2048×3` | 0/3072 | 0.1181641 | 0.0258893 | 0.071195 |
+| `2048×1024×8` | 0/16384 | 0.1015625 | 0.0182557 | 0.110105 |
 
-### 測資生成
+### 4.3 W4A16
 
-* 使用 `std::mt19937(seed=42)`，確保測試可重現。
-* `W_bit[m][k]` 隨機產生 0 或 1。
-* 數學權重映射：
+| Shape | Mismatches | Max Abs Error | Mean Abs Error | Max Bound Ratio |
+| :--- |  :---: | ---: | ---: | ---: |
+| `256×256×1` | 0/256 | 0.0703125 | 0.0156141 | 0.135683 |
+| `256×256×3` | 0/768 | 0.0937500 | 0.0172345 | 0.208138 |
+| `512×512×8` | 0/4096 | 0.1503906 | 0.0251053 | 0.166362 |
+| `1024×1024×16` | 0/16384 | 0.2421875 | 0.0370468 | 0.122323 |
+| `1024×2048×3` | 0/3072 | 0.2578125 | 0.0523770 | 0.068848 |
+| `2048×1024×8` | 0/16384 | 0.2089844 | 0.0367069 | 0.118889 |
 
-```text
-W_bit = 1 → +1
-W_bit = 0 → -1
-```
+### 4.4 驗證總結
 
-* Activation 範圍：
-
-```text
-[-0.1, 0.1]
-```
-
-* Weight scale 固定為：
-
-```text
-1.0
-```
-
-### T-MAC 路徑
-
-1. 由原始 `W_bit[M×K]` 經 `pack_tmac_weights()` 轉換成 T-MAC 交錯格式。
-2. 每 4 個 K 維度組成一個 4-bit LUT index。
-3. 依 32-channel block 進行 lane 與 nibble 排列。
-4. 每個 batch 獨立建立 LUT。
-5. 執行 W2/W3/W4 T-MAC AVX2 GEMM。
-
-### Independent Naive 路徑
-
-Ground Truth 完全不使用：
-
-```text
-packed_weights
-qlut
-lut_scales_all
-lut_biases_all
-tbl_update_avx2
-weight_offset
-bit_plane_base
-```
-
-而是直接使用最單純的三層迴圈：
-
-```cpp
-for (int n = 0; n < N; ++n)
-{
-    for (int m = 0; m < M; ++m)
-    {
-        for (int k = 0; k < K; ++k)
-        {
-            output[n * M + m] +=
-                logical_weight[m * K + k] *
-                activation[n * K + k];
-        }
-    }
-}
-```
-
-另外依獨立數學公式判斷：
-
-```cpp
-const int bit_plane = (m / 8) % Bits;
-const bool gets_bias = (bit_plane == 0);
-```
-
-因此這條路徑能驗證：
-
-* `pack_tmac_weights()` 是否正確。
-* nibble index 是否正確對應四個 K 維度。
-* W2/W3/W4 bit-plane 分組是否正確。
-* batch activation offset 是否正確。
-* batch output offset 是否正確。
-* 每個 batch 是否使用自己的 LUT。
-* M tiling 與跨 tile phase 是否正確。
-* T-MAC 查表結果是否在量化誤差內等價於直接矩陣乘法。
-
----
-
-## 5. 獨立 GEMM 驗證測資
-
-### 測試尺寸
-
-| Shape（M×K×N） | 驗證目的 |
-| :--- | :--- |
-| `256×256×1` | 基本 GEMV / GEMM 邏輯 |
-| `256×256×3` | N>1、非 2 次方 batch |
-| `512×512×2` | M_BLOCK 邊界 |
-| `1024×1024×4` | 跨越兩個 M tile |
-| `1024×2048×3` | K Expansion |
-| `2048×1024×3` | M Expansion 與多個 tile |
-
-### 比對指標
-
-每一組測試輸出：
-
-* `mismatches`
-* `max_abs_err`
-* `mean_abs_err`
-* `RMSE`
-* T-MAC 單次執行時間
-* Naive 三層迴圈執行時間
-* 最大誤差元素位置
-* 前四個 output 數值
-
-### 容忍度
-
-```text
-absolute tolerance = 0.08
-relative tolerance = 0.02
-```
-
-逐元素判定：
-
-```text
-|T-MAC - Naive| <= 0.08 + 0.02 × |Naive|
-```
-
-此容忍度用來吸收 T-MAC INT8 LUT 動態量化造成的誤差，而不是 SIMD 與 Scalar 的 ULP 差異。
-
----
-
-## 5-1. W2A16 獨立 GEMM 驗證結果
-
-| Shape | Mismatches | Max Abs Error | Mean Abs Error | RMSE | T-MAC | Naive |
-| :--- | :---: | ---: | ---: | ---: | ---: | ---: |
-| `256×256×1` | 0/256 | 0.0146146 | 0.00422584 | 0.00524177 | 0.005383 ms | 0.478702 ms |
-| `256×256×3` | 0/768 | 0.0171266 | 0.00455940 | 0.00569081 | 0.013832 ms | 1.50758 ms |
-| `512×512×2` | 0/1024 | 0.0283976 | 0.00652202 | 0.00824566 | 0.025604 ms | 3.84120 ms |
-| `1024×1024×4` | 0/4096 | 0.0453402 | 0.00926170 | 0.0115603 | 0.147235 ms | 33.0978 ms |
-| `1024×2048×3` | 0/3072 | 0.0609264 | 0.0128743 | 0.0161699 | 0.202118 ms | 48.8335 ms |
-| `2048×1024×3` | 0/6144 | 0.0461664 | 0.00919513 | 0.0115851 | 0.180045 ms | 45.9355 ms |
+| Bit-width | Numerical Cases | Outputs | Mismatches | Thread Mismatches | Kernel Mismatches | Schedule Cases | 最大 Bound Ratio | Result |
+| :---: | :---: | ---: | ---: | ---: | ---: | :---: | ---: | :---: |
+| W2 | 12 | 45,568 | 0 | 0 | 0 | 12 | 0.189461 | PASS |
+| W3 | 12 | 45,568 | 0 | 0 | 0 | 12 | 0.202234 | PASS |
+| W4 | 12 | 45,568 | 0 | 0 | 0 | 16 | 0.208138 | PASS |
+| **Total** | **36** | **136,704** | **0** | **0** | **0** | **40** | **0.208138** | **PASS** |
 
 ### 結果分析
 
-W2 六組測資全部為 PASS
-
-全部 output 均未超出容忍度。
-
-隨 K 與矩陣規模增加，最大誤差與平均誤差逐漸上升，符合 LUT INT8 量化誤差會隨累加長度增加的預期。最大誤差出現在 `1024×2048×3`，為 0.0609264，仍低於設定的判定範圍。
-
----
-
-## 5-2. W3A16 獨立 GEMM 驗證結果
-
-| Shape | Mismatches | Max Abs Error | Mean Abs Error | RMSE | T-MAC | Naive |
-| :--- | :---: | ---: | ---: | ---: | ---: | ---: |
-| `256×256×1` | 0/256 | 0.0146146 | 0.00422584 | 0.00524177 | 0.005611 ms | 0.677698 ms |
-| `256×256×3` | 0/768 | 0.0171266 | 0.00455940 | 0.00569081 | 0.011286 ms | 1.41900 ms |
-| `512×512×2` | 0/1024 | 0.0283977 | 0.00652203 | 0.00824567 | 0.018415 ms | 3.56223 ms |
-| `1024×1024×4` | 0/4096 | 0.0453399 | 0.00926170 | 0.0115603 | 0.159029 ms | 32.9088 ms |
-| `1024×2048×3` | 0/3072 | 0.0609264 | 0.0128743 | 0.0161699 | 0.185891 ms | 43.0123 ms |
-| `2048×1024×3` | 0/6144 | 0.0461664 | 0.00919513 | 0.0115851 | 0.157032 ms | 39.6314 ms |
-
-### 結果分析
-
-W3 六組測資全部為 PASS，且包含：
-
-```text
-M=1024
-M=2048
-```
-
-因此實際跨越 `M_BLOCK=512` 的多個 tile。這代表 global bit-plane 修正不只在共用 qlut 的 Bitwise 驗證中成立，也在完全獨立的原始 `W_bit` 三層迴圈 Ground Truth 中通過。
-
-W3 與 W2/W4 的誤差統計高度接近，表示三種 bit-plane 分組在相同 logical weights 與 activation 下，皆能保持一致的數學結果。
+* 36 組數值案例、136,704 個 output 全部通過，沒有 mismatch。
+* 40 組官方 schedule candidate regression 全部通過。
+* 最大 `max_bound_ratio` 為 0.208138，遠低於 1。
+* W2、W3、W4 的誤差隨 bit-plane 加權總和增加而逐步上升，符合 INT8 LUT quantization、FP16 scale/bias 與 output rounding 的預期。
+* `thread_mismatches=0` 證明 OpenMP tile 分派沒有 race condition 造成的輸出差異。
+* `kernel_mismatches=0` 證明 register-blocked optimized kernel 與 reference accumulation 路徑一致。
 
 ---
 
-## 5-3. W4A16 獨立 GEMM 驗證結果
-
-| Shape | Mismatches | Max Abs Error | Mean Abs Error | RMSE | T-MAC | Naive |
-| :--- | :---: | ---: | ---: | ---: | ---: | ---: |
-| `256×256×1` | 0/256 | 0.0146146 | 0.00422584 | 0.00524177 | 0.003848 ms | 0.425761 ms |
-| `256×256×3` | 0/768 | 0.0171266 | 0.00455940 | 0.00569081 | 0.007681 ms | 1.21481 ms |
-| `512×512×2` | 0/1024 | 0.0283976 | 0.00652202 | 0.00824566 | 0.015854 ms | 3.22159 ms |
-| `1024×1024×4` | 0/4096 | 0.0453402 | 0.00926170 | 0.0115603 | 0.110622 ms | 26.3994 ms |
-| `1024×2048×3` | 0/3072 | 0.0609264 | 0.0128743 | 0.0161699 | 0.160918 ms | 39.1637 ms |
-| `2048×1024×3` | 0/6144 | 0.0461661 | 0.00919513 | 0.0115851 | 0.241806 ms | 40.4320 ms |
-
-### 結果分析
-
-W4 六組測資全部為 PASS。此結果延續先前 GEMV 獨立三層迴圈驗證，並新增：
-
-* N>1 batched activation。
-* Batched output stride。
-* 每個 batch 獨立 LUT。
-* M tiling。
-* K Expansion 與 M Expansion。
-
-因此 W4 已不只驗證單一 GEMV，而是進一步驗證 Batched GEMM 路徑。
-
----
-
-## 6. 獨立 GEMM 驗證總結
-
-| Bit-width | Cases | Total Outputs | Mismatches | Result |
-| :---: | :---: | ---: | ---: | :---: |
-| W2 | 6 | 15,360 | 0 | PASS |
-| W3 | 6 | 15,360 | 0 | PASS |
-| W4 | 6 | 15,360 | 0 | PASS |
-| **Total** | **18** | **46,080** | **0** | **PASS** |
-
-### 誤差統計觀察
-
-三種 bit-width 的最大誤差皆約為：
-
-```text
-0.0609264
-```
-
-平均絕對誤差範圍約為：
-
-```text
-0.0042 ～ 0.0129
-```
-
-RMSE 範圍約為：
-
-```text
-0.0052 ～ 0.0162
-```
-
-誤差隨 K 維度和累加長度增加而上升，但所有結果均在量化容忍度內，且沒有觀察到：
-
-* tile 邊界突然增加大量 mismatch。
-* batch 1 以後輸出錯位。
-* M Expansion 或 K Expansion 專屬錯誤。
-* W3 在第二個 tile 後失效。
-* packed weight layout 與 logical weight 不一致。
-
-### 驗證結論
-
-兩層驗證共同證明：
-
-1. AVX2 LUT kernel 與 Scalar LUT 模擬器達成 Bitwise 一致。
-2. T-MAC packed/LUT GEMM 與不使用 qlut 的原始 `W_bit` 三層迴圈，在 INT8 LUT 量化誤差範圍內一致。
-3. W2、W3、W4 的 batched GEMM、M tiling 與 global bit-plane 邏輯皆通過代表性測試。
-
----
-
-## 7. 效能測試矩陣設計
+## 5. 效能測試設計
 
 ### Batch Size
 
 | N | 對應情境 |
 | :---: | :--- |
-| 1 | Decode / 單 token 推論 |
+| 1 | Decode / 單 token GEMV-like GEMM |
 | 8 | 小 batch / 小型 prefill |
 | 32 | 中型 prefill |
 | 128 | 大 batch GEMM |
 | 512 | 高重用 batched GEMM |
 
-### Matrix Shape 分類
+### Matrix Shape
 
 | 分類 | 測試矩陣 |
 | :--- | :--- |
@@ -412,378 +258,278 @@ RMSE 範圍約為：
 | M Expansion | 4096×1024、8192×2048、11008×4096、14336×4096 |
 | Medium Asymmetric | 1024×2048、2048×1024、2048×4096、4096×2048 |
 
-每個 bit-width 共 80 組測試，W2/W3/W4 合計 240 組，oneMKL 共 80 組 baseline。
-
----
-
-## 8. 整體效能結果
-
-| Bit | Cases | T-MAC Faster | Median Speedup | Geomean Speedup | Best Case | Worst Case |
-| :---: | :---: | :---: | :---: | :---: | :--- | :--- |
-| W2 | 80 | 67/80 | 4.057× | 3.694× | 1024×1024×8（65.196×） | 8192×2048×512（0.462×） |
-| W3 | 80 | 68/80 | 5.647× | 4.812× | 1024×1024×8（99.374×） | 8192×2048×512（0.453×） |
-| W4 | 80 | 67/80 | 5.402× | 4.193× | 1024×1024×8（56.830×） | 2048×4096×512（0.551×） |
-
-### 主要觀察
-
-* 三種 T-MAC bit-width 在多數測資中皆快於 oneMKL FP16。
-* W3 的整體 geomean speedup 最高，達 4.812×。
-* 三種 bit-width 的最佳 case 均出現在 `1024×1024×8`。
-* 最差 case 多出現在 `N=512`，顯示 oneMKL 在高 batch、高資料重用場景下可有效發揮 dense GEMM 吞吐能力。
-
----
-
-## 8-1. 不同 Batch Size 的效能趨勢
-
-### Median Speedup by N
-
-| Bit | N=1 | N=8 | N=32 | N=128 | N=512 |
-| :---: | ---: | ---: | ---: | ---: | ---: |
-| W2 | 9.960× | 13.170× | 4.104× | 1.370× | 0.786× |
-| W3 | 14.030× | 19.943× | 5.492× | 1.628× | 0.919× |
-| W4 | 11.006× | 16.840× | 5.402× | 1.566× | 0.756× |
-
-### Geomean Speedup by N
-
-| Bit | N=1 | N=8 | N=32 | N=128 | N=512 |
-| :---: | ---: | ---: | ---: | ---: | ---: |
-| W2 | 8.889× | 15.621× | 4.225× | 1.455× | 0.806× |
-| W3 | 13.889× | 22.618× | 4.882× | 1.771× | 0.950× |
-| W4 | 11.426× | 18.121× | 4.886× | 1.616× | 0.792× |
-
-### N=1：Decode
-
-N=1 時 T-MAC 優勢明顯。Decode 每次只處理少量 activation，運算密度低，容易受權重讀取與 memory bandwidth 限制。低位元 packed weights 能顯著降低權重流量。
-
-### N=8：最佳加速區間
-
-本次最佳 speedup 全部出現在 `1024×1024×8`：
-
-* W2：65.196×
-* W3：99.374×
-* W4：56.830×
-
-此時 MKL 尚未充分攤平 dense GEMM 啟動與資料搬移成本，而 T-MAC 能在多個 batch 間分攤部分查表成本。
-
-### N=32 與 N=128
-
-T-MAC 在大多數測資中仍快於 MKL，但 speedup 開始下降。隨 batch 增加，MKL 對權重與 activation 的重用率提高，dense GEMM 硬體利用率逐漸上升。
-
-### N=512
-
-三種 bit-width 的 geomean speedup 均低於 1，代表在高 batch、高重用場景下，oneMKL FP16 通常更具優勢。
-
----
-
-## 8-2. 不同矩陣類型的效能趨勢
-
-### Median Speedup by Shape Type
-
-| Bit | Square | K Expansion | M Expansion | Medium Asymmetric |
-| :---: | ---: | ---: | ---: | ---: |
-| W2 | 4.117× | 4.104× | 3.697× | 4.163× |
-| W3 | 7.808× | 3.702× | 3.032× | 6.837× |
-| W4 | 3.537× | 6.243× | 5.788× | 4.622× |
-
-### Geomean Speedup by Shape Type
-
-| Bit | Square | K Expansion | M Expansion | Medium Asymmetric |
-| :---: | ---: | ---: | ---: | ---: |
-| W2 | 4.044× | 3.569× | 3.133× | 4.119× |
-| W3 | 6.634× | 3.708× | 3.699× | 5.890× |
-| W4 | 4.335× | 4.501× | 4.262× | 3.716× |
-
-### Square GEMM
-
-小 N 下 T-MAC 優勢明顯；N=512 時部分大型 square GEMM 接近或低於 1×。
-
-### K Expansion
-
-K 較大時，單一 output row 需要讀取更多權重。小 N 時低位元權重流量優勢明顯，但大 N 時 MKL 可充分重用資料並提高吞吐。
-
-### M Expansion
-
-輸出 channel 增加時，T-MAC 在小 batch 仍有優勢；大 batch 則會受到 output 寫回、LUT buffer 與資料流量影響。
-
-### Medium Asymmetric
-
-非方形矩陣結果顯示，T-MAC 優勢同時受 M/K 比例、batch size 與資料重用程度影響，不能只由 bit-width 單獨判斷。
-
----
-
-## 8-3. 代表性效能個案
-
-| Bit | 類型 | Shape | MKL Latency | T-MAC Latency | Speedup | MKL GFLOPS | T-MAC GFLOPS |
-| :---: | :---: | :--- | ---: | ---: | ---: | ---: | ---: |
-| W2 | Best | 1024×1024×8 | 6.339550 ms | 0.097238 ms | 65.196× | 2.646 | 172.537 |
-| W2 | Worst | 8192×2048×512 | 53.646600 ms | 116.033000 ms | 0.462× | 320.242 | 148.061 |
-| W3 | Best | 1024×1024×8 | 6.339550 ms | 0.063795 ms | 99.374× | 2.646 | 262.988 |
-| W3 | Worst | 8192×2048×512 | 53.646600 ms | 118.486000 ms | 0.453× | 320.242 | 144.994 |
-| W4 | Best | 1024×1024×8 | 6.339550 ms | 0.111552 ms | 56.830× | 2.646 | 150.398 |
-| W4 | Worst | 2048×4096×512 | 29.661500 ms | 53.860600 ms | 0.551× | 289.599 | 159.485 |
-
-### 最佳 case
-
-`1024×1024×8` 規模與 batch 均較小，MKL 難以完全攤平 kernel dispatch 與資料搬移成本，T-MAC 透過低位元權重與 LUT 查表顯著降低權重讀取壓力。
-
-### 最差 case
-
-最差 case 集中於 N=512。此時 MKL 能充分利用 dense GEMM 的資料重用與向量化吞吐，T-MAC 的 LUT 建構、查表與輸出寫回成本相對提高。
-
----
-
-## 9. Iteration 設計
-
-### 定義
-
-`iteration` 表示同一組矩陣測資在計時區間中重複執行的次數。
-
-```cpp
-const double total_flops_per_call =
-    2.0 * M * K * N;
-
-const int iterations =
-    std::max(
-        2,
-        std::min(
-            100,
-            static_cast<int>(
-                5e10 / total_flops_per_call
-            )
-        )
-    );
-```
-
-最後輸出的 latency 為：
+每個 bit-width 包含：
 
 ```text
-average latency = total elapsed time / iterations
+4 categories × 4 shapes × 5 batch sizes × 4 thread budgets = 320 cases
 ```
 
-### 為什麼每組數字不同
+W2、W3、W4 合計 960 組 T-MAC／oneMKL 配對結果。
 
-* 小矩陣單次時間太短，需提高 iteration 降低計時誤差。
-* 大矩陣單次已耗時很久，需降低 iteration 控制總測試時間。
-* 最少 2 次、最多 100 次。
+### 計時方法
 
-例如：
+每組正式測量前執行 3 次 warm-up。依 logical FLOPs 決定 sample 數：
 
 ```text
-1024×1024×1 → 100 iterations
-8192×8192×512 → 2 iterations
+FLOPs < 1e8   ：21 samples
+FLOPs < 1e9   ：11 samples
+FLOPs < 1e10  ：7 samples
+其他          ：5 samples
 ```
 
-iteration 不會改變每次 GEMM 的平均 latency，只用來提高量測穩定性並控制測試總時間。
+最終 latency 使用 sample median，並額外記錄 P90。T-MAC 的 `preprocess_ms` 包含 FP16 Activation LUT 建立，`kernel_ms` 為查表與 output reduction；`total_ms` 為兩者合計。
+
+### Offline Autotune
+
+每個 `bit × M × K × N × requested_threads` 都測試所有有效官方 schedule candidates，使用候選 latency 的 median 選擇 `bm/bn/kfactor`。`tuning_ms` 為離線調優成本，不計入正式 `total_ms`。
 
 ---
 
-## 10. 編譯與執行方式
+## 6. T-MAC 與 oneMKL 效能結果
 
-### 10.1 Bitwise 驗證
+### 6.1 整體結果
+
+| Bit | Threads | Cases | T-MAC Faster | Median Speedup | Geomean Speedup |
+| :---: | :---: | :---: | :---: | ---: | ---: |
+| W2 | 1 | 80 | 50/80 | 1.551× | 1.581× |
+| W2 | 2 | 80 | 66/80 | 3.088× | 2.841× |
+| W2 | 4 | 80 | 72/80 | 2.268× | 2.739× |
+| W2 | 8 | 80 | 70/80 | 2.257× | 2.518× |
+| W3 | 1 | 80 | 47/80 | 1.234× | 1.179× |
+| W3 | 2 | 80 | 55/80 | 2.492× | 2.086× |
+| W3 | 4 | 80 | 65/80 | 1.698× | 2.240× |
+| W3 | 8 | 80 | 66/80 | 1.820× | 2.112× |
+| W4 | 1 | 80 | 33/80 | 0.895× | 0.749× |
+| W4 | 2 | 80 | 50/80 | 1.816× | 1.499× |
+| W4 | 4 | 80 | 59/80 | 1.200× | 1.675× |
+| W4 | 8 | 80 | 53/80 | 1.507× | 1.800× |
+
+整體結果顯示：
+
+* W2A16 效能最穩定，所有 thread budget 的 geomean 均高於 oneMKL；2 threads 為 2.841×，4 threads 為 2.739×。
+* W3A16 單執行緒 geomean 為 1.179×，多執行緒提升至 2.086×～2.240×。
+* W4A16 單執行緒 geomean 為 0.749×，但 2、4、8 thread budget 分別提升至 1.499×、1.675×、1.800×。
+* bit-width 增加時需要處理更多 bit-plane，因此 W2 → W3 → W4 的整體優勢依序下降。
+* 多執行緒下 T-MAC 的勝率明顯增加，W2 在 4 threads 時有 72/80 組快於 oneMKL，W3 在 8-thread budget 時有 66/80 組較快。
+
+### 6.2 不同 Batch Size
+
+| Bit | Threads | N=1 | N=8 | N=32 | N=128 | N=512 |
+| :---: | :---: | ---: | ---: | ---: | ---: | ---: |
+| W2 | 1 | 4.692× | 5.827× | 1.591× | 0.698× | 0.326× |
+| W2 | 2 | 4.375× | 11.048× | 3.161× | 1.616× | 0.750× |
+| W2 | 4 | 2.488× | 8.505× | 3.771× | 1.903× | 1.016× |
+| W2 | 8 | 1.023× | 7.940× | 4.917× | 2.053× | 1.234× |
+| W3 | 1 | 3.752× | 4.151× | 1.364× | 0.518× | 0.207× |
+| W3 | 2 | 3.485× | 8.375× | 2.779× | 1.002× | 0.486× |
+| W3 | 4 | 2.214× | 7.253× | 3.221× | 1.380× | 0.791× |
+| W3 | 8 | 1.572× | 5.763× | 3.279× | 1.514× | 0.935× |
+| W4 | 1 | 1.973× | 2.862× | 0.922× | 0.295× | 0.153× |
+| W4 | 2 | 2.462× | 6.295× | 2.070× | 0.689× | 0.342× |
+| W4 | 4 | 1.231× | 6.286× | 2.534× | 1.080× | 0.623× |
+| W4 | 8 | 1.079× | 6.415× | 3.262× | 1.159× | 0.722× |
+
+主要趨勢：
+
+* N=1 與 N=8 是低位元 LUT kernel 最具優勢的範圍。單執行緒 W2 在 N=1、N=8 的 geomean 分別為 4.692×、5.827×。
+* N=32 時，W2/W3 在所有 thread budget 下仍有優勢；W4 單執行緒接近交叉點，多執行緒後重新超過 oneMKL。
+* N=128 時，W2 在 2～8 thread budget 下仍有 1.616×～2.053×；W3/W4 需要 4 threads 以上才較穩定超過 oneMKL。
+* N=512 時，oneMKL 的 dense GEMM blocking 與資料重用優勢增加。W2 在 4～8 thread budget 接近或超過 oneMKL，W3/W4 整體仍較弱。
+* 8-thread budget 在 N=1 的結果較不穩定，原因是部分 shape 可平行 tile 不足，以及異質核心與 OpenMP 排程成本；因此不呈現單調 thread scaling。
+
+### 6.3 不同矩陣類型
+
+| Bit | Threads | Square | K Expansion | M Expansion | Medium Asymmetric |
+| :---: | :---: | ---: | ---: | ---: | ---: |
+| W2 | 1 | 1.583× | 1.397× | 1.453× | 1.945× |
+| W2 | 2 | 2.733× | 2.688× | 2.798× | 3.171× |
+| W2 | 4 | 2.834× | 2.553× | 2.900× | 2.683× |
+| W2 | 8 | 2.363× | 3.671× | 2.643× | 1.753× |
+| W3 | 1 | 1.137× | 1.051× | 1.122× | 1.440× |
+| W3 | 2 | 1.985× | 1.844× | 2.008× | 2.575× |
+| W3 | 4 | 2.144× | 1.961× | 2.385× | 2.513× |
+| W3 | 8 | 1.589× | 2.790× | 2.396× | 1.874× |
+| W4 | 1 | 0.961× | 0.603× | 0.635× | 0.855× |
+| W4 | 2 | 1.742× | 1.264× | 1.343× | 1.708× |
+| W4 | 4 | 2.249× | 1.370× | 1.595× | 1.602× |
+| W4 | 8 | 2.133× | 1.982× | 1.491× | 1.664× |
+
+矩陣類型並未改變整體 bit-width 次序：
+
+```text
+W2 > W3 > W4
+```
+
+W2 在各 category 與各 thread budget 下均具有整體優勢。W3 單執行緒在四類矩陣中仍略快於 oneMKL，W4 單執行緒則在 K/M Expansion 與 Medium Asymmetric 較弱；當使用 2 threads 以上後，W4 的四類 geomean 均提升至 1× 以上。
+
+### 6.4 多執行緒擴充性
+
+以下為各實作相對自身單執行緒 latency 的 geomean scaling：
+
+| Bit | T-MAC 2T | T-MAC 4T | T-MAC 8T | MKL 2T | MKL 4T | MKL 8T |
+| :---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| W2 | 2.024× | 2.267× | 1.985× | 1.126× | 1.309× | 1.247× |
+| W3 | 2.132× | 2.540× | 2.200× | 1.205× | 1.337× | 1.228× |
+| W4 | 2.326× | 2.909× | 2.905× | 1.162× | 1.301× | 1.209× |
+
+結果顯示：
+
+* T-MAC 在 2 threads 時約有 2.02×～2.33× scaling，4 threads 時約有 2.27×～2.91×。
+* W2/W3 在 4 threads 達到較佳整體平衡；8-thread budget 受到 active thread 數與異質核心排程影響，未必持續提升。
+* W4 的工作量較大，較能攤平 thread 啟動成本，因此 4 與 8 thread budget 的 scaling 接近。
+* 此測試中 oneMKL FP16 GEMM 的整體 thread scaling 約為 1.1×～1.34×，因此 T-MAC 在多執行緒比較中的相對優勢高於單執行緒。
+
+### 6.5 與 T-MAC 官方論文及程式方向對照
+
+本結果與官方論文及 repository 的主要趨勢大致一致：
+
+1. **低 bit-width 優勢較大**：官方指出 LUT kernel 的計算量與 latency 會隨 weight bit-width 近似線性擴張。本測試中所有 thread budget 均呈現 W2 最佳、W3 次之、W4 最弱。
+2. **Decode 與小 batch 具有明顯優勢**：N=1 與 N=8 的 geomean 普遍高於 N=128、N=512，符合低位元權重讀取與直接 LUT mpGEMM 在低重用場景的優勢。
+3. **多執行緒能提高整體 throughput**：T-MAC 在 2～4 threads 有穩定 scaling，多數 W2/W3/W4 案例在多執行緒下超過 oneMKL。
+4. **效能高度依賴硬體與 shape**：官方 repository 亦指出 x86 CPU 的記憶體頻寬與架構差異很大，特別是 4-bit 不保證在所有 x86 平台都有顯著加速。本測試的 W4 單執行緒 geomean 低於 1，與此限制相符。
+
+本測試 baseline 為 oneMKL FP16 GEMM，官方論文主要比較 llama.cpp、OpenBLAS 或端到端模型推論；CPU、編譯器、kernel generation 與測試情境也不同，因此只能比較整體趨勢，不能直接對照絕對 speedup 數值。
+
+官方資料：
+
+* [T-MAC Paper：CPU Renaissance via Table Lookup for Low-Bit LLM Deployment on Edge](https://arxiv.org/abs/2407.00088)
+* [Microsoft T-MAC Official Repository](https://github.com/microsoft/T-MAC)
+
+---
+
+## 7. 編譯與執行
+
+### 7.1 T-MAC 與 Independent Verifier
 
 ```bash
-g++ -O3 -std=c++17 \
-    -mavx2 \
-    -mfma \
-    -ffp-contract=off \
-    verify_tmac_gemm.cpp \
-    -o verify_tmac_gemm
+g++ -O3 -std=c++17 -mavx2 -mfma -mf16c -fopenmp \
+    -Wall -Wextra -Wpedantic \
+    t_mac_gemm_w234.cpp -o t_mac_gemm_w234
 
-./verify_tmac_gemm
-```
-
-預期：
-
-```text
-W2: BITWISE PASS
-W3: BITWISE PASS
-W4: BITWISE PASS
-```
-
-### 10.2 Independent 三層迴圈驗證
-
-```bash
-g++ -O2 -std=c++17 \
-    -mavx2 \
-    -mfma \
+g++ -O2 -std=c++17 -mavx2 -mfma -mf16c -fopenmp \
+    -Wall -Wextra -Wpedantic \
     verify_tmac_gemm_independent.cpp \
     -o verify_tmac_gemm_independent
-
-./verify_tmac_gemm_independent
 ```
 
-同時保存 log：
-
 ```bash
-./verify_tmac_gemm_independent \
-    | tee verify_tmac_gemm_independent.log
+./verify_tmac_gemm_independent | tee verify_tmac_gemm_independent.log
 ```
 
 預期：
 
 ```text
-Final result
-W2: PASS
-W3: PASS
-W4: PASS
+packing=PASS
+thread_mismatches=0
+kernel_mismatches=0
+FINAL W2=PASS W3=PASS W4=PASS
 ```
 
-查看 return code：
+### 7.2 OpenMP 設定
 
 ```bash
-echo $?
+export OMP_DYNAMIC=FALSE
+export OMP_PROC_BIND=close
+export OMP_PLACES=cores
+export OMP_WAIT_POLICY=ACTIVE
 ```
 
-```text
-0 → 全部通過
-1 → 至少一組失敗
-```
-
-### 10.3 T-MAC W2/W3/W4 Benchmark
+### 7.3 T-MAC Benchmark
 
 ```bash
-g++ -O3 -std=c++17 \
-    -mavx2 \
-    -mfma \
-    t_mac_gemm_w234.cpp \
-    -o t_mac_gemm_w234
-
-./t_mac_gemm_w234
+./t_mac_gemm_w234 \
+    --threads 1,2,4,8 \
+    --autotune \
+    | tee tmac_fp16_mt.log
 ```
 
-只執行特定 bit-width：
-
-```bash
-./t_mac_gemm_w234 2
-./t_mac_gemm_w234 3
-./t_mac_gemm_w234 4
-```
-
-### 10.4 oneMKL FP16 Benchmark
+### 7.4 oneMKL Benchmark
 
 ```bash
 source /opt/intel/oneapi/setvars.sh
 
-g++ -O3 -std=c++17 \
-    -mavx2 \
-    -mfma \
-    -mf16c \
-    mkl_fp16_gemm.cpp \
+g++ -O3 -std=c++17 -mavx2 -mfma -mf16c -fopenmp \
+    mkl_fp16_gemm_mt.cpp \
     -I${MKLROOT}/include \
     -L${MKLROOT}/lib/intel64 \
     -Wl,--no-as-needed \
     -lmkl_intel_lp64 \
     -lmkl_gnu_thread \
     -lmkl_core \
-    -lgomp \
-    -lpthread \
-    -lm \
-    -ldl \
-    -o mkl_fp16_gemm
-
-./mkl_fp16_gemm 1
+    -lgomp -lpthread -lm -ldl \
+    -o mkl_fp16_gemm_mt
 ```
-
-### 10.5 自動比較
-
-直接執行：
 
 ```bash
-python3 compare_tmac_mkl.py
+./mkl_fp16_gemm_mt --threads 1,2,4,8 | tee mkl_fp16_mt.log
 ```
 
-使用既有 log：
+### 7.5 結果配對
 
 ```bash
-python3 compare_tmac_mkl.py \
-    --tmac-log tmac_gemm_benchmark.log \
-    --mkl-log mkl_gemm_benchmark.log \
-    --output benchmark_comparison.csv
+python3 -m py_compile compare_tmac_mkl_mt.py
+
+python3 compare_tmac_mkl_mt.py \
+    --tmac-log tmac_fp16_mt.log \
+    --mkl-log mkl_fp16_mt.log \
+    --output comparison_mt.csv
 ```
 
-產生：
+預期配對數：
 
 ```text
-tmac_gemm_benchmark.log
-mkl_gemm_benchmark.log
-benchmark_comparison.csv
+Matched cases: 960
 ```
 
 ---
 
-## 11. 系統驗證工作流
+## 8. 系統驗證工作流
 
 ```mermaid
 graph TD
-    A[原始 logical W_bit / Activation] --> B[pack_tmac_weights]
-    B --> C[T-MAC Packed AVX2 LUT GEMM]
-    A --> D[Independent N-M-K 三層迴圈]
-    C --> E[量化誤差比對]
-    D --> E
-    E -->|W2/W3/W4 全部 PASS| F[確認數學 Ground Truth]
+    A[qweights M×K / FP16 Activation N×K] --> B[bit-plane decomposition]
+    B --> C[official-style weight permutation]
+    C --> D[FP16 Activation LUT preprocessor]
+    D --> E[INT8 LUT / AVX2 PSHUFB]
+    E --> F[register-blocked K accumulation]
+    F --> G[bit-plane reduction]
+    G --> H[T-MAC FP16 output N×M]
 
-    G[verify_tmac_gemm.cpp] --> H[AVX2 LUT Kernel]
-    G --> I[Scalar LUT Golden]
-    H --> J[Bitwise 比對]
-    I --> J
-    J -->|全部 BITWISE PASS| K[確認 SIMD / FMA / Tile 實作]
-
-    F --> L[t_mac_gemm_w234.cpp]
+    A --> I[q_signed × FP16 scale]
+    I --> J[N-M-K independent triple loop]
+    J --> K[FP16 Ground Truth N×M]
+    H --> L[誤差與 bound 比對]
     K --> L
-    M[mkl_fp16_gemm.cpp] --> N[compare_tmac_mkl.py]
-    L --> N
-    N --> O[benchmark_comparison.csv]
-    N --> P[Latency / GFLOPS / Speedup 分析]
+    L --> M[W2/W3/W4 PASS]
+
+    M --> N[T-MAC 1/2/4/8 thread benchmark]
+    O[oneMKL cblas_hgemm 1/2/4/8 threads] --> P[compare_tmac_mkl_mt.py]
+    N --> P
+    P --> Q[comparison_mt.csv / 960 matched cases]
 ```
 
 ---
 
-## 12. 最終結論
+## 9. 結論
 
-本專案目前已完成兩層互補的 T-MAC GEMM 正確性驗證。
+本專案完成 T-MAC W2A16、W3A16、W4A16 的 standalone AVX2/F16C/OpenMP GEMM 實作，並對齊官方低位元 LUT compute、bit-plane decomposition、`bm/bn/kfactor` schedule candidate、離線 weight permutation 與多執行緒外層 tile 分派。
 
-### 指令級驗證
+正確性方面：
 
-`verify_tmac_gemm.cpp` 顯示 W2、W3、W4 全部為 `BITWISE PASS`，證明 AVX2 shuffle、widening accumulation、FMA、M tiling 與 global bit-plane indexing 和純量 LUT 定義完全一致。
+* 36 組數值案例、136,704 個 FP16 output 全部通過。
+* W2、W3、W4 的 packing、Ground Truth、thread determinism 與 optimized/reference kernel 全部為 0 mismatch。
+* 40 組 schedule candidate regression 全部 PASS。
+* 最大 `max_bound_ratio` 為 0.208138，所有誤差均在量化與 FP16 rounding 上界內。
 
-### 數學 Ground Truth 驗證
+效能方面：
 
-`verify_tmac_gemm_independent.cpp` 使用原始 `W_bit` 與 `N×M×K` 三層迴圈，不依賴 qlut 或 packed weights 作為 Golden Reference。共執行 18 組測試、比對 46,080 個 output，結果為：
+* W2A16 在 1／2／4／8 thread budget 的 geomean speedup 分別為 1.581×、2.841×、2.739×、2.518×。
+* W3A16 分別為 1.179×、2.086×、2.240×、2.112×。
+* W4A16 分別為 0.749×、1.499×、1.675×、1.800×。
+* W2 的整體效能與勝率最高，W3 次之，W4 因 bit-plane 數量增加而較接近或低於 dense FP16 baseline。
+* T-MAC 的主要優勢集中於 N=1～32；N 增加至 128～512 後，oneMKL 的 dense blocking 與資料重用優勢逐步增加。
+* 2～4 threads 是整體較穩定的平行區間；8-thread budget 會受到 active tile 數量、OpenMP 排程與異質核心影響，並非所有 shape 都能使用完整 8 threads。
 
-```text
-W2: PASS
-W3: PASS
-W4: PASS
-Total mismatches: 0
-```
+因此可得到以下結論：
 
-這補足了 Scalar LUT 驗證可能存在的同源錯誤盲點，並確認：
-
-* 權重打包與 nibble layout 正確。
-* Batched activation/output indexing 正確。
-* 每個 batch 的 LUT offset 正確。
-* M tiling 與跨 tile bit-plane phase 正確。
-* W2/W3/W4 在量化誤差範圍內等價於直接矩陣乘法。
-
-### 效能結論
-
-與單執行緒 oneMKL FP16 GEMM 相比：
-
-* W2：geomean speedup 3.694×。
-* W3：geomean speedup 4.812×。
-* W4：geomean speedup 4.193×。
-
-T-MAC 最適合 N=1～32 的 Decode 與小 batch 場景；當 N=512 時，oneMKL dense GEMM 的資料重用與高吞吐能力開始占優。
-
-因此目前可以得到以下核心結論：
-
-> T-MAC W2/W3/W4 的 AVX2 LUT GEMM 已同時通過 Bitwise 指令級驗證與獨立三層迴圈數學驗證。其主要效能優勢集中在 memory-bound 的 Decode 與小 batch 推論；在高 batch、高資料重用的 dense GEMM 場景中，oneMKL FP16 仍較具優勢。
-
-### 後續可延伸方向
-
-* 多執行緒 T-MAC 與多執行緒 MKL 比較。
-* 分離 LUT construction 與 lookup kernel latency。
-* 比較不同 `M_BLOCK`。
-* 加入多次 benchmark 取 median，降低系統雜訊。
-* 使用實際模型量化權重取代隨機 packed weights。
-* 推導 INT8 LUT 量化的理論誤差上界。
+> T-MAC 在真正 FP16 Activation 與低位元權重下，能透過 INT8 LUT、bit-wise accumulation 與官方風格 tiling 降低 mixed-precision GEMM 成本。效能隨 bit-width 增加而下降，W2A16 的優勢最穩定；在 Decode、小 batch 與適當多執行緒設定下，T-MAC 整體可明顯優於 oneMKL FP16 GEMM，而大 batch 與高 bit-width 則更依賴矩陣 shape、CPU 架構與 schedule 選擇。

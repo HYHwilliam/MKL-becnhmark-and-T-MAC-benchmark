@@ -13,9 +13,9 @@ naive_triple_loop
 t_mac_verify
 t_mac_input
 
-verify_tmac_gemm
+verify_tmac_gemm_independent
 t_mac_gemm_w234
-mkl_fp16_gemm
+mkl_fp16_gemm_mt
 
 t_mac_pthread_benchmark
 t_mac_openmp_benchmark
@@ -50,8 +50,9 @@ data_W_bit_8192
 .vscode/
 
 *.log
-tmac_gemm_benchmark
-mkl_gemm_benchmark
+tmac_fp16_mt
+mkl_fp16_mt
+verify_tmac_gemm_independent_mt
 
 # Temporary comparison output
 benchmark_comparison.csv
