@@ -21,6 +21,8 @@ t_mac_pthread_benchmark
 t_mac_openmp_benchmark
 t_mac_thread8_stress
 
+t_mac_neon_benchmark_arm64
+
 lut_gemm_pthread_benchmark
 lut_gemm_openmp_benchmark
 
