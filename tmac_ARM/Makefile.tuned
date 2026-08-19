@@ -1,0 +1,36 @@
+CXX ?= g++
+CROSS_CXX ?= aarch64-linux-gnu-g++
+
+COMMON_FLAGS := -O3 -std=c++17 -Wall -Wextra -Wpedantic
+ARM_FLAGS := -march=armv8.2-a+fp16
+THREAD_FLAGS := -pthread
+
+ARM64_DIR := build/arm64
+NATIVE_DIR := build/native
+
+SRC := tmac_neon_mt_tuned_wxa16.cpp
+
+.PHONY: tuned tuned-cross qemu-smoke clean
+
+tuned: $(NATIVE_DIR)/tmac_neon_mt_tuned_wxa16
+
+tuned-cross: $(ARM64_DIR)/tmac_neon_mt_tuned_wxa16
+
+$(NATIVE_DIR)/tmac_neon_mt_tuned_wxa16: $(SRC) benchmark_common.h tmac_layout.h
+	mkdir -p $(dir $@)
+	$(CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $(THREAD_FLAGS) $(SRC) -o $@
+
+$(ARM64_DIR)/tmac_neon_mt_tuned_wxa16: $(SRC) benchmark_common.h tmac_layout.h
+	mkdir -p $(dir $@)
+	$(CROSS_CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $(THREAD_FLAGS) $(SRC) -o $@
+
+qemu-smoke: tuned-cross
+	qemu-aarch64 -cpu max -L /usr/aarch64-linux-gnu \
+	  ./$(ARM64_DIR)/tmac_neon_mt_tuned_wxa16 \
+	  --bits 2 --threads 4 --max-size 256 \
+	  --tune-number 2 --tune-repeat 2 --tune-cooldown-ms 0
+
+clean:
+	rm -f \
+	  $(ARM64_DIR)/tmac_neon_mt_tuned_wxa16 \
+	  $(NATIVE_DIR)/tmac_neon_mt_tuned_wxa16

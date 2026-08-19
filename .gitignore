@@ -1,64 +1,37 @@
-# 編譯產物
+# Build artifacts
 *.o
+*.obj
 *.out
 *.bin
-t_mac_benchmark
-mkl_benchmark
-t_mac_debug
-lut_gemm_benchmark
-lut_gemm_avx2_debug
-lut_gemm_avx2_benchmark
-
-naive_triple_loop
-t_mac_verify
-t_mac_input
-
-verify_tmac_gemm_independent
-t_mac_gemm_w234
-mkl_fp16_gemm_mt
-
-t_mac_pthread_benchmark
-t_mac_openmp_benchmark
-t_mac_thread8_stress
-
-t_mac_neon_benchmark_arm64
-
-lut_gemm_pthread_benchmark
-lut_gemm_openmp_benchmark
-
-mkl_int8_verify
-mkl_int8_a0_positive
-
-data_act_256
-data_act_1024
-data_act_2048
-data_act_4096
-data_act_8192
-
-data_avx2_out_256
-data_avx2_out_1024
-data_avx2_out_2048
-data_avx2_out_4096
-data_avx2_out_8192
-
-data_W_bit_256
-data_W_bit_1024
-data_W_bit_2048
-data_W_bit_4096
-data_W_bit_8192
-
-# 常見暫存檔
 *.exe
-.vscode/
+*.a
+*.so
 
+# Current build directories
+tmac_ARM/build/
+x86_GEMM/build/
+experiments/*/build/
+
+# Old local copies / generated directories
+tmac_ARM_test/
+verify/
+verify_GEMM/
+
+# Old local executables
+/t_mac_benchmark
+/t_mac_debug
+/mkl_benchmark
+/lut_gemm_benchmark
+/lut_gemm_avx2_benchmark
+/lut_gemm_avx2_debug
+/t_mac_pthread_benchmark
+
+# Logs / generated results / tuning cache
 *.log
-tmac_fp16_mt
-mkl_fp16_mt
-verify_tmac_gemm_independent_mt
-
-# Temporary comparison output
 benchmark_comparison.csv
+tmac_schedule_cache*.tsv
 
-# Python cache
+# Python / IDE
 __pycache__/
 *.py[cod]
+.vscode/
