@@ -53,4 +53,4 @@ g++ -O3 -std=c++17 -mavx2 -mfma     lut_gemm_avx2_gemv.cpp     -o build/lut_gemm
 
 這裡的 correctness 只代表此 microbenchmark 在指定測資下的 lookup / accumulation 流程一致，不是完整低位元模型 correctness proof。
 
-正式 W2/W3/W4-A16 ARM T-MAC correctness 與 benchmark 請使用 `tmac_ARM/`。
+正式 W2/W3/W4-A16 ARM T-MAC correctness 與 benchmark 請使用 `tmac_ARM/CPU/`。

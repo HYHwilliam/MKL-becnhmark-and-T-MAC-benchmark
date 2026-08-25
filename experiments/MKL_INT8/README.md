@@ -88,26 +88,28 @@ $$\text{unsigned}(x) + \text{ao} = (x + 128) + (-128) = x$$
 
 ## 3. 編譯與執行指令 (MKL INT8 驗證)
 
-執行 MKL Benchmark 之前，必須先載入 Intel oneAPI 的環境變數並連結相關函式庫。請在 `verify/` 資料夾下執行：
+執行 MKL Benchmark 之前，必須先載入 Intel oneAPI 的環境變數並連結相關函式庫。請在 `experiments/MKL_INT8/` 資料夾下執行：
 
 ```bash
 # 需先設定 MKL 環境 (依據您的安裝路徑可能有所不同)
 source /opt/intel/oneapi/setvars.sh
 export LD_LIBRARY_PATH=${MKLROOT}/lib/intel64:$LD_LIBRARY_PATH
 
+mkdir -p build
+
 # mkl_int8_a0_positive.cpp：原始呼叫方式，全正數測試
-g++ -O2 -I.. -I${MKLROOT}/include mkl_int8_a0_positive.cpp \
+g++ -O2 -I${MKLROOT}/include mkl_int8_a0_positive.cpp \
     -L${MKLROOT}/lib/intel64 \
     -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl \
-    -o mkl_int8_a0_positive
-./mkl_int8_a0_positive
+    -o build/mkl_int8_a0_positive
+./build/mkl_int8_a0_positive
 
 # mkl_int8_verify.cpp：隨機含負數輸入，Offset 修正版
-g++ -O2 -I.. -I${MKLROOT}/include mkl_int8_verify.cpp \
+g++ -O2 -I${MKLROOT}/include mkl_int8_verify.cpp \
     -L${MKLROOT}/lib/intel64 \
     -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl \
-    -o mkl_int8_verify
-./mkl_int8_verify
+    -o build/mkl_int8_verify
+./build/mkl_int8_verify
 ```
 
 ## 4. 系統驗證工作流（Workflow）

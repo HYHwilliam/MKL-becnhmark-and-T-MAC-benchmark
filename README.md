@@ -74,14 +74,14 @@ make qemu-verify BITS=2 THREADS=4
 make qemu-verify BITS=3 THREADS=4
 make qemu-verify BITS=4 THREADS=4
 
-python3 verify_tuned_freeze.py
+python3 scripts/verify_tuned_freeze.py
 make -f Makefile.tuned qemu-smoke
 ```
 
 完整 MT hardening：
 
 ```bash
-./verify_mt_hardening.sh
+./scripts/verify_mt_hardening.sh
 ```
 
 QEMU 僅用於 correctness，不使用其 latency 當作 ARM 實機效能。

@@ -77,7 +77,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Compare T-MAC and oneMKL FP16 benchmark logs.")
     parser.add_argument("--tmac-log", required=True)
     parser.add_argument("--mkl-log", required=True)
-    parser.add_argument("--output", default="comparison_mt.csv")
+    parser.add_argument("--output", default="results/comparison_mt.csv")
     args = parser.parse_args()
 
     tmac = parse_log(args.tmac_log)

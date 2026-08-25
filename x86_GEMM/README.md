@@ -410,18 +410,22 @@ W2 在各 category 與各 thread budget 下均具有整體優勢。W3 單執行�
 ### 7.1 T-MAC 與 Independent Verifier
 
 ```bash
+mkdir -p build results
+```
+
+```bash
 g++ -O3 -std=c++17 -mavx2 -mfma -mf16c -fopenmp \
     -Wall -Wextra -Wpedantic \
-    tmac_avx2_gemm_w234.cpp -o tmac_avx2_gemm_w234
+    tmac_avx2_gemm_w234.cpp -o build/tmac_avx2_gemm_w234
 
 g++ -O2 -std=c++17 -mavx2 -mfma -mf16c -fopenmp \
     -Wall -Wextra -Wpedantic \
     tmac_avx2_gemm_verify.cpp \
-    -o tmac_avx2_gemm_verify
+    -o build/tmac_avx2_gemm_verify
 ```
 
 ```bash
-./tmac_avx2_gemm_verify | tee tmac_avx2_gemm_verify.log
+./build/tmac_avx2_gemm_verify | tee tmac_avx2_gemm_verify.log
 ```
 
 預期：
@@ -445,7 +449,7 @@ export OMP_WAIT_POLICY=ACTIVE
 ### 7.3 T-MAC Benchmark
 
 ```bash
-./tmac_avx2_gemm_w234 \
+./build/tmac_avx2_gemm_w234 \
     --threads 1,2,4,8 \
     --autotune \
     | tee tmac_fp16_mt.log
@@ -465,11 +469,11 @@ g++ -O3 -std=c++17 -mavx2 -mfma -mf16c -fopenmp \
     -lmkl_gnu_thread \
     -lmkl_core \
     -lgomp -lpthread -lm -ldl \
-    -o mkl_fp16_gemm_mt
+    -o build/mkl_fp16_gemm_mt
 ```
 
 ```bash
-./mkl_fp16_gemm_mt --threads 1,2,4,8 | tee mkl_fp16_mt.log
+./build/mkl_fp16_gemm_mt --threads 1,2,4,8 | tee mkl_fp16_mt.log
 ```
 
 ### 7.5 結果配對
@@ -480,7 +484,7 @@ python3 -m py_compile compare_tmac_mkl_mt.py
 python3 compare_tmac_mkl_mt.py \
     --tmac-log tmac_fp16_mt.log \
     --mkl-log mkl_fp16_mt.log \
-    --output comparison_mt.csv
+    --output results/comparison_mt.csv
 ```
 
 預期配對數：
@@ -513,7 +517,7 @@ graph TD
     M --> N[T-MAC 1/2/4/8 thread benchmark]
     O[oneMKL cblas_hgemm 1/2/4/8 threads] --> P[compare_tmac_mkl_mt.py]
     N --> P
-    P --> Q[comparison_mt.csv / 960 matched cases]
+    P --> Q[results/comparison_mt.csv / 960 matched cases]
 ```
 
 ---

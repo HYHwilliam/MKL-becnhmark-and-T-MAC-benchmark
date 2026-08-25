@@ -23,7 +23,7 @@ def extract_braced(text: str, marker: str) -> str:
     raise RuntimeError(f"unterminated block: {marker}")
 
 if not BASE.exists() or not TUNED.exists():
-    print("ERROR: run this script inside tmac_ARM_benchmark with both MT sources present.")
+    print("ERROR: run this script from tmac_ARM/CPU with both MT sources under src/.")
     sys.exit(2)
 
 base = BASE.read_text(encoding="utf-8")
