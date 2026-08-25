@@ -1,6 +1,6 @@
 # T-MAC ARM WnA16 Benchmark
 
-本資料夾用於 ARM CPU 上的 T-MAC W2/W3/W4-A16 GEMV / GEMM benchmark，並預留與群聯板 NPU GEMM 比較的流程。
+本資料夾用於 ARM CPU 上的 T-MAC W2/W3/W4-A16 GEMV / GEMM benchmark，並預留與群聯板 NPU T-MAC / GEMM 比較的流程。
 
 ## 實作
 
@@ -41,7 +41,7 @@ N > 1  -> GEMM
 
 ## 1. WSL：Cross Compile 與 QEMU 驗證
 
-此步驟用於在 x86 / WSL 上先確認 ARM binary correctness，不作為正式效能測試。
+此步驟用於在 x86 / WSL 上確認 ARM binary correctness，不作為正式效能測試。
 
 ### 安裝工具
 
@@ -78,7 +78,7 @@ build/arm64/tmac_neon_mt_tuned_wxa16
 
 ### Correctness Verification
 
-第一次建立環境、修改 kernel 或 compiler flags 後建議執行：
+第一次建立環境、修改 kernel、packing / LUT 邏輯或 compiler flags 後建議執行：
 
 ```bash
 make qemu-verify BITS=2 THREADS=4
@@ -88,13 +88,19 @@ make qemu-verify BITS=4 THREADS=4
 python3 scripts/verify_tuned_freeze.py
 ```
 
-QEMU 只驗證 correctness，不使用 QEMU latency 作為 benchmark 結果。
+Multi-thread hardening：
+
+```bash
+./scripts/verify_mt_hardening.sh
+```
+
+QEMU 只用於 correctness 與 smoke test，不使用 QEMU latency 或 tuning winner 作為正式 benchmark 結果。
 
 ---
 
-# 2. 群聯 Ubuntu 板：CPU T-MAC
+## 2. 群聯 Ubuntu 板：CPU T-MAC
 
-## 環境確認
+### 環境確認
 
 ```bash
 uname -m
@@ -113,14 +119,14 @@ aarch64
 -march=armv8.2-a+fp16
 ```
 
-## 安裝編譯工具
+### 安裝編譯工具
 
 ```bash
 sudo apt update
 sudo apt install -y build-essential make g++ git python3
 ```
 
-## 取得專案
+### 取得專案
 
 若板子尚未有 repository：
 
@@ -132,13 +138,13 @@ git clone https://github.com/HYHwilliam/MKL-becnhmark-and-T-MAC-benchmark.git
 cd MKL-becnhmark-and-T-MAC-benchmark/tmac_ARM/CPU
 ```
 
-若已放在 `~/benchmark_project`：
+若專案已放在 `~/benchmark_project`：
 
 ```bash
 cd ~/benchmark_project/tmac_ARM/CPU
 ```
 
-## Native Compile
+### Native Compile
 
 ```bash
 make clean
@@ -206,11 +212,17 @@ W3 / W4 將：
 --bits 4
 ```
 
-已確認 correctness 且程式未修改時，可直接執行 benchmark。
+Tuned 版本可另外確認 frozen compute：
+
+```bash
+python3 scripts/verify_tuned_freeze.py
+```
+
+已確認 correctness 且程式、compiler 與平台未修改時，可直接執行 benchmark。
 
 ---
 
-# 4. CPU Benchmark
+## 4. CPU Benchmark
 
 W2：
 
@@ -247,11 +259,33 @@ W3 / W4：
 
 Tuned schedule 必須在實際群聯 ARM CPU 上重新搜尋，不使用 QEMU 或其他 CPU 的 tuning 結果。
 
+正式效能數據只在實際 ARM target 上量測。
+
 ---
 
-# 5. 群聯 NPU GEMM
+## 5. 群聯 NPU T-MAC / GEMM
 
-Ubuntu 只提供 CPU 編譯環境。NPU GEMM 仍需要群聯板實際提供的：
+NPU implementation 位於：
+
+```text
+tmac_ARM/NPU/
+```
+
+進行 NPU 開發或編譯前，先切換至 NPU 目錄。
+
+若 repository 位於 `~/benchmark_project`：
+
+```bash
+cd ~/benchmark_project/tmac_ARM/NPU
+```
+
+若是在群聯板上直接 clone：
+
+```bash
+cd ~/MKL-becnhmark-and-T-MAC-benchmark/tmac_ARM/NPU
+```
+
+Ubuntu 本身只提供一般 CPU 開發環境。NPU T-MAC / GEMM 仍需要群聯板實際提供的：
 
 ```text
 NPU SDK
@@ -260,9 +294,9 @@ NPU compiler / toolchain
 driver
 ```
 
-因此 NPU 的正式編譯指令必須依板子上的 SDK 決定。
+因此 NPU 的正式編譯指令必須依板子實際提供的 SDK 決定。
 
-## 確認 NPU SDK
+### 確認 NPU SDK
 
 先確認板子是否已安裝 NPU SDK：
 
@@ -287,41 +321,72 @@ find <NPU_SDK_PATH> \
     2>/dev/null | head -100
 ```
 
+在撰寫自己的 NPU T-MAC 前，建議先成功編譯並執行 SDK 官方 sample，以確認 driver、runtime 與 compiler/toolchain 都能正常工作。
+
 ---
 
 ## 6. NPU Build
 
-NPU SDK 常見有三種方式，使用板子實際提供的方式即可。
+NPU build output 統一放在：
+
+```text
+tmac_ARM/NPU/build/
+```
+
+以下指令都假設目前位於：
+
+```text
+tmac_ARM/NPU/
+```
+
+NPU SDK 常見有三種使用方式，實際使用哪一種需依群聯板提供的 SDK 決定。
 
 ### A. SDK 提供 NPU Compiler
 
 ```bash
+cd ~/benchmark_project/tmac_ARM/NPU
+
 source <NPU_SDK_PATH>/env.sh
 
-mkdir -p build/npu
+mkdir -p build
 
 <NPU_COMPILER> \
     <NPU_FLAGS> \
     <NPU_GEMM_SOURCE> \
-    -o build/npu/gemm_npu
+    -o build/tmac_npu
 ```
+
+其中：
+
+```text
+<NPU_SDK_PATH>
+<NPU_COMPILER>
+<NPU_FLAGS>
+<NPU_GEMM_SOURCE>
+```
+
+必須依實際 SDK 文件替換。
 
 ### B. SDK 使用 CMake / Toolchain
 
 ```bash
+cd ~/benchmark_project/tmac_ARM/NPU
+
 source <NPU_SDK_PATH>/env.sh
 
-cmake -S <NPU_GEMM_PROJECT> \
-      -B build/npu \
+cmake -S . \
+      -B build \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE=<NPU_TOOLCHAIN_FILE>
 
-cmake --build build/npu -j$(nproc)
+cmake --build build -j$(nproc)
 ```
+
+實際 CMake project 結構與 toolchain file 位置需依 SDK 決定。
 
 ### C. SDK 使用 ONNX / Model Compiler
 
-若 NPU 不直接編譯 C++ GEMM，而是使用 MatMul / GEMM model：
+若 NPU 不直接編譯 C/C++ GEMM，而是使用 MatMul / GEMM graph：
 
 ```text
 GEMM / MatMul
@@ -338,23 +403,27 @@ NPU Runtime
 典型形式：
 
 ```bash
+cd ~/benchmark_project/tmac_ARM/NPU
+
+mkdir -p build
+
 <NPU_MODEL_COMPILER> \
     --model gemm.onnx \
-    --output build/npu/gemm_model
+    --output build/gemm_model
 ```
 
 執行：
 
 ```bash
 <NPU_RUNTIME_RUNNER> \
-    --model build/npu/gemm_model
+    --model build/gemm_model
 ```
 
-`<...>` 必須依群聯板實際 NPU SDK 文件替換，不應使用未確認的 compiler 或參數。
+`<...>` 皆為 placeholder，取得群聯板實際 NPU SDK 後才能替換為正式 compiler、runtime 與參數，不應自行假設。
 
 ---
 
-# 7. NPU Correctness 與 Benchmark
+## 7. NPU Correctness 與 Benchmark
 
 NPU GEMM 建議先使用小矩陣確認 correctness：
 
@@ -372,13 +441,27 @@ K = 256
 N = 8
 ```
 
-correctness 確認後即可進行正式 benchmark，不需要每次重複驗證。
+若後續實作 W2A16 / W3A16 / W4A16 NPU T-MAC，correctness test 應使用與 CPU 相同的：
+
+```text
+weight
+activation
+scale
+M
+K
+N
+bit-width
+```
+
+確認 correctness 後，再進行正式 benchmark。
+
+程式、compiler、runtime 與硬體環境沒有修改時，不需要每次 benchmark 都重新執行完整 correctness verification。
 
 ---
 
-# 8. CPU / NPU 比較
+## 8. CPU / NPU Benchmark 比較
 
-CPU 與 NPU benchmark 應使用相同：
+CPU 與 NPU benchmark 應盡量使用相同：
 
 ```text
 M
@@ -387,18 +470,39 @@ N
 warmup
 repeat
 資料格式
+輸入資料
 計時範圍
 ```
 
-至少分開記錄：
+共用 benchmark 設定與結果建議集中在：
 
 ```text
-CPU:
+tmac_ARM/benchmark/
+```
+
+例如：
+
+```text
+tmac_ARM/benchmark/
+├── configs/
+├── scripts/
+└── results/
+    ├── CPU/
+    ├── NPU/
+    └── comparison/
+```
+
+CPU 至少分開記錄：
+
+```text
 preprocess_ms
 kernel_ms
 total_ms
+```
 
-NPU:
+NPU 至少分開記錄：
+
+```text
 upload_ms
 kernel_ms
 download_ms
@@ -412,28 +516,59 @@ kernel-only vs kernel-only
 end-to-end vs end-to-end
 ```
 
-避免將 CPU end-to-end latency 與 NPU kernel-only latency 直接比較。
+避免將：
 
-如果 CPU 使用 W2A16、W3A16、W4A16，而 NPU 使用 INT8 / FP16，也必須在結果中明確標示資料格式差異。
+```text
+CPU end-to-end latency
+```
+
+直接與：
+
+```text
+NPU kernel-only latency
+```
+
+比較。
+
+如果 CPU 使用：
+
+```text
+W2A16
+W3A16
+W4A16
+```
+
+而 NPU 實際只能使用：
+
+```text
+INT8
+FP16
+或其他格式
+```
+
+則必須在 benchmark 結果中明確標示資料格式差異，不能視為完全相同的運算條件。
 
 ---
 
-# 9. 建議實際操作流程
+## 9. 建議實際操作流程
 
 第一次在群聯板上：
 
 ```text
 1. 確認 Ubuntu / AArch64 / CPU ISA
 2. 安裝 g++ / make
-3. Native compile CPU T-MAC
-4. 執行一次 correctness verification
-5. 執行 CPU benchmark
-6. 確認 NPU SDK / runtime
-7. 先成功編譯並執行官方 NPU sample
-8. 編譯自己的 NPU GEMM
-9. 執行一次 NPU correctness verification
-10. 執行 NPU benchmark
-11. 比較 CPU / NPU
+3. 進入 tmac_ARM/CPU
+4. Native compile CPU T-MAC
+5. 執行一次 CPU correctness verification
+6. 執行 CPU benchmark
+7. 進入 tmac_ARM/NPU
+8. 確認 NPU SDK / runtime / driver
+9. 成功編譯並執行官方 NPU sample
+10. 建立或編譯自己的 NPU T-MAC / GEMM
+11. 執行一次 NPU correctness verification
+12. 執行 NPU benchmark
+13. 將結果保存至 tmac_ARM/benchmark/results/
+14. 比較 CPU / NPU
 ```
 
 之後程式與環境沒有修改時：
@@ -444,22 +579,40 @@ NPU benchmark
 比較結果
 ```
 
-不需要每次重新執行 `--verify-only`。
+不需要每次重新執行完整 `--verify-only`。
 
 ---
 
 ## Build Output
 
-CPU：
+CPU cross-compile：
+
+```text
+tmac_ARM/CPU/build/arm64/
+```
+
+CPU native：
 
 ```text
 tmac_ARM/CPU/build/native/
 ```
 
-NPU 建議：
+NPU：
 
 ```text
 tmac_ARM/NPU/build/
 ```
 
-`build/`、binary、log 與 generated benchmark data 不應提交至 GitHub。
+CPU / NPU benchmark 結果：
+
+```text
+tmac_ARM/benchmark/results/
+```
+
+`build/`、binary、log 與其他 generated artifacts 不應提交至 GitHub。
+
+正式需要保存的 benchmark 結果則集中管理於：
+
+```text
+tmac_ARM/benchmark/results/
+```
