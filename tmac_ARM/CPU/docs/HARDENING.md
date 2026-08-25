@@ -37,7 +37,7 @@
 完整 hardening：
 
 ```bash
-./verify_mt_hardening.sh
+./scripts/verify_mt_hardening.sh
 ```
 
 固定驗證 W2/W3/W4 與 threads `1,2,4,8`。
@@ -45,13 +45,13 @@
 只指定 bits：
 
 ```bash
-BITS_LIST="2 3 4" ./verify_mt_hardening.sh
+BITS_LIST="2 3 4" ./scripts/verify_mt_hardening.sh
 ```
 
 單次 cross-compile：
 
 ```bash
-aarch64-linux-gnu-g++ -O3 -std=c++17 -Wall -Wextra -Wpedantic \
+aarch64-linux-gnu-g++ -O3 -std=c++17 -Wall -Wextra -Wpedantic -Iinclude \
     -march=armv8.2-a+fp16 -pthread \
     src/tmac_neon_mt_fixed_wxa16.cpp \
     -o build/arm64/tmac_neon_mt_fixed_wxa16

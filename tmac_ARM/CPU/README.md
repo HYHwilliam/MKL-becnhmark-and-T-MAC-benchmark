@@ -129,7 +129,7 @@ cd ~
 
 git clone https://github.com/HYHwilliam/MKL-becnhmark-and-T-MAC-benchmark.git
 
-cd MKL-becnhmark-and-T-MAC-benchmark/tmac_ARM
+cd MKL-becnhmark-and-T-MAC-benchmark/tmac_ARM/CPU
 ```
 
 若已放在 `~/benchmark_project`：
@@ -453,13 +453,13 @@ NPU benchmark
 CPU：
 
 ```text
-tmac_ARM/build/native/
+tmac_ARM/CPU/build/native/
 ```
 
 NPU 建議：
 
 ```text
-npu_GEMM/build/
+tmac_ARM/NPU/build/
 ```
 
 `build/`、binary、log 與 generated benchmark data 不應提交至 GitHub。

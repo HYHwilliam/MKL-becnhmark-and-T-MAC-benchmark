@@ -64,7 +64,7 @@ parallel compute
 WSL cross-compile：
 
 ```bash
-aarch64-linux-gnu-g++ -O3 -std=c++17 -Wall -Wextra -Wpedantic \
+aarch64-linux-gnu-g++ -O3 -std=c++17 -Wall -Wextra -Wpedantic -Iinclude \
     -march=armv8.2-a+fp16 -pthread \
     src/tmac_neon_mt_tuned_wxa16.cpp \
     -o build/arm64/tmac_neon_mt_tuned_wxa16
@@ -79,7 +79,7 @@ make -f Makefile.tuned tuned-cross
 真實 ARM / Phison：
 
 ```bash
-g++ -O3 -std=c++17 -Wall -Wextra -Wpedantic \
+g++ -O3 -std=c++17 -Wall -Wextra -Wpedantic -Iinclude \
     -march=armv8.2-a+fp16 -pthread \
     src/tmac_neon_mt_tuned_wxa16.cpp \
     -o build/native/tmac_neon_mt_tuned_wxa16
