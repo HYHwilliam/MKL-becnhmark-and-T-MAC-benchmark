@@ -1,7 +1,7 @@
 CXX ?= g++
 CROSS_CXX ?= aarch64-linux-gnu-g++
 
-COMMON_FLAGS := -O3 -std=c++17 -Wall -Wextra -Wpedantic
+COMMON_FLAGS := -O3 -std=c++17 -Wall -Wextra -Wpedantic -Iinclude
 ARM_FLAGS := -march=armv8.2-a+fp16
 SCALAR_FLAGS := -fno-tree-vectorize -fno-tree-slp-vectorize -ffp-contract=off
 THREAD_FLAGS := -pthread
@@ -33,43 +33,43 @@ cross: \
 	$(ARM64_DIR)/tmac_neon_st_wxa16 \
 	$(ARM64_DIR)/tmac_neon_mt_fixed_wxa16
 
-$(LOCAL_DIR)/math_scalar_wxa16: math_scalar_wxa16.cpp benchmark_common.h
+$(LOCAL_DIR)/math_scalar_wxa16: src/math_scalar_wxa16.cpp include/benchmark_common.h
 	mkdir -p $(dir $@)
 	$(CXX) $(COMMON_FLAGS) $(SCALAR_FLAGS) $< -o $@
 
-$(LOCAL_DIR)/tmac_scalar_wxa16: tmac_scalar_wxa16.cpp benchmark_common.h tmac_layout.h
+$(LOCAL_DIR)/tmac_scalar_wxa16: src/tmac_scalar_wxa16.cpp include/benchmark_common.h include/tmac_layout.h
 	mkdir -p $(dir $@)
 	$(CXX) $(COMMON_FLAGS) $(SCALAR_FLAGS) $< -o $@
 
-$(ARM64_DIR)/math_scalar_wxa16: math_scalar_wxa16.cpp benchmark_common.h
+$(ARM64_DIR)/math_scalar_wxa16: src/math_scalar_wxa16.cpp include/benchmark_common.h
 	mkdir -p $(dir $@)
 	$(CROSS_CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $(SCALAR_FLAGS) $< -o $@
 
-$(ARM64_DIR)/tmac_scalar_wxa16: tmac_scalar_wxa16.cpp benchmark_common.h tmac_layout.h
+$(ARM64_DIR)/tmac_scalar_wxa16: src/tmac_scalar_wxa16.cpp include/benchmark_common.h include/tmac_layout.h
 	mkdir -p $(dir $@)
 	$(CROSS_CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $(SCALAR_FLAGS) $< -o $@
 
-$(ARM64_DIR)/tmac_neon_st_wxa16: tmac_neon_st_wxa16.cpp benchmark_common.h tmac_layout.h
+$(ARM64_DIR)/tmac_neon_st_wxa16: src/tmac_neon_st_wxa16.cpp include/benchmark_common.h include/tmac_layout.h
 	mkdir -p $(dir $@)
 	$(CROSS_CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $< -o $@
 
-$(ARM64_DIR)/tmac_neon_mt_fixed_wxa16: tmac_neon_mt_fixed_wxa16.cpp benchmark_common.h tmac_layout.h
+$(ARM64_DIR)/tmac_neon_mt_fixed_wxa16: src/tmac_neon_mt_fixed_wxa16.cpp include/benchmark_common.h include/tmac_layout.h
 	mkdir -p $(dir $@)
 	$(CROSS_CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $(THREAD_FLAGS) $< -o $@
 
-$(NATIVE_DIR)/math_scalar_wxa16: math_scalar_wxa16.cpp benchmark_common.h
+$(NATIVE_DIR)/math_scalar_wxa16: src/math_scalar_wxa16.cpp include/benchmark_common.h
 	mkdir -p $(dir $@)
 	$(CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $(SCALAR_FLAGS) $< -o $@
 
-$(NATIVE_DIR)/tmac_scalar_wxa16: tmac_scalar_wxa16.cpp benchmark_common.h tmac_layout.h
+$(NATIVE_DIR)/tmac_scalar_wxa16: src/tmac_scalar_wxa16.cpp include/benchmark_common.h include/tmac_layout.h
 	mkdir -p $(dir $@)
 	$(CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $(SCALAR_FLAGS) $< -o $@
 
-$(NATIVE_DIR)/tmac_neon_st_wxa16: tmac_neon_st_wxa16.cpp benchmark_common.h tmac_layout.h
+$(NATIVE_DIR)/tmac_neon_st_wxa16: src/tmac_neon_st_wxa16.cpp include/benchmark_common.h include/tmac_layout.h
 	mkdir -p $(dir $@)
 	$(CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $< -o $@
 
-$(NATIVE_DIR)/tmac_neon_mt_fixed_wxa16: tmac_neon_mt_fixed_wxa16.cpp benchmark_common.h tmac_layout.h
+$(NATIVE_DIR)/tmac_neon_mt_fixed_wxa16: src/tmac_neon_mt_fixed_wxa16.cpp include/benchmark_common.h include/tmac_layout.h
 	mkdir -p $(dir $@)
 	$(CXX) $(COMMON_FLAGS) $(ARM_FLAGS) $(THREAD_FLAGS) $< -o $@
 

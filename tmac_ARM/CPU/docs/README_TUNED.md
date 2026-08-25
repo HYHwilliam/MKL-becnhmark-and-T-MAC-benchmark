@@ -1,6 +1,6 @@
 # T-MAC NEON MT Tuned
 
-第五組 benchmark：`tmac_neon_mt_tuned_wxa16.cpp`
+第五組 benchmark：`src/tmac_neon_mt_tuned_wxa16.cpp`
 
 用途是比較：
 
@@ -66,7 +66,7 @@ WSL cross-compile：
 ```bash
 aarch64-linux-gnu-g++ -O3 -std=c++17 -Wall -Wextra -Wpedantic \
     -march=armv8.2-a+fp16 -pthread \
-    tmac_neon_mt_tuned_wxa16.cpp \
+    src/tmac_neon_mt_tuned_wxa16.cpp \
     -o build/arm64/tmac_neon_mt_tuned_wxa16
 ```
 
@@ -81,7 +81,7 @@ make -f Makefile.tuned tuned-cross
 ```bash
 g++ -O3 -std=c++17 -Wall -Wextra -Wpedantic \
     -march=armv8.2-a+fp16 -pthread \
-    tmac_neon_mt_tuned_wxa16.cpp \
+    src/tmac_neon_mt_tuned_wxa16.cpp \
     -o build/native/tmac_neon_mt_tuned_wxa16
 ```
 
@@ -98,7 +98,7 @@ make -f Makefile.tuned tuned
 確認 tuned 版本沒有改 frozen compute：
 
 ```bash
-python3 verify_tuned_freeze.py
+python3 scripts/verify_tuned_freeze.py
 ```
 
 QEMU smoke：

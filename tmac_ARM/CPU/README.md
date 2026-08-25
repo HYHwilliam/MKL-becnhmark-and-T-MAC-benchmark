@@ -5,11 +5,11 @@
 ## 實作
 
 ```text
-math_scalar_wxa16.cpp
-tmac_scalar_wxa16.cpp
-tmac_neon_st_wxa16.cpp
-tmac_neon_mt_fixed_wxa16.cpp
-tmac_neon_mt_tuned_wxa16.cpp
+src/math_scalar_wxa16.cpp
+src/tmac_scalar_wxa16.cpp
+src/tmac_neon_st_wxa16.cpp
+src/tmac_neon_mt_fixed_wxa16.cpp
+src/tmac_neon_mt_tuned_wxa16.cpp
 ```
 
 - `math_scalar_wxa16`：純數學 scalar baseline
@@ -85,7 +85,7 @@ make qemu-verify BITS=2 THREADS=4
 make qemu-verify BITS=3 THREADS=4
 make qemu-verify BITS=4 THREADS=4
 
-python3 verify_tuned_freeze.py
+python3 scripts/verify_tuned_freeze.py
 ```
 
 QEMU 只驗證 correctness，不使用 QEMU latency 作為 benchmark 結果。

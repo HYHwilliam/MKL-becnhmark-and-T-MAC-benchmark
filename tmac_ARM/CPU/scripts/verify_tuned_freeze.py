@@ -2,8 +2,8 @@
 from pathlib import Path
 import sys
 
-BASE = Path("tmac_neon_mt_fixed_wxa16.cpp")
-TUNED = Path("tmac_neon_mt_tuned_wxa16.cpp")
+BASE = Path("src/tmac_neon_mt_fixed_wxa16.cpp")
+TUNED = Path("src/tmac_neon_mt_tuned_wxa16.cpp")
 
 def extract_braced(text: str, marker: str) -> str:
     start = text.find(marker)
