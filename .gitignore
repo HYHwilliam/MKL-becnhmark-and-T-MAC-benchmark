@@ -8,7 +8,7 @@
 *.so
 
 # Current build directories
-tmac_ARM/build/
+tmac_ARM/CPU/build/
 x86_GEMM/build/
 experiments/*/build/
 
@@ -35,3 +35,5 @@ tmac_schedule_cache*.tsv
 __pycache__/
 *.py[cod]
 .vscode/
+tmac_ARM/NPU/build/
+tmac_ARM/benchmark/results/**/*.log

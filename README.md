@@ -1,6 +1,6 @@
 # T-MAC CPU Benchmark and Verification
 
-本 repository 記錄 T-MAC 在 x86 與 ARM CPU 上的實作、正確性驗證與 benchmark。現在主要研究主線為 `tmac_ARM/`。
+本 repository 記錄 T-MAC 在 x86 與 ARM CPU 上的實作、正確性驗證與 benchmark。現在主要研究主線為 `tmac_ARM/CPU/`。
 
 ## 目前比較
 
@@ -25,7 +25,10 @@ Y[N x M] = X * W^T
 ## Repository
 
 ```text
-tmac_ARM/          ARM 正式 benchmark 主線
+tmac_ARM/          ARM CPU / NPU T-MAC benchmark
+  CPU/             ARM CPU T-MAC implementation
+  NPU/             ARM NPU T-MAC implementation
+  benchmark/       CPU / NPU comparison
 x86_GEMM/          x86 AVX2 W2/W3/W4-A16 GEMM 驗證
 experiments/
   LUT_GEMM_CPU/    LUT-GEMM scalar / AVX2 CPU microbenchmark
@@ -49,7 +52,7 @@ qemu-aarch64 --version
 ## ARM Cross Compile
 
 ```bash
-cd tmac_ARM
+cd tmac_ARM/CPU
 make cross
 make -f Makefile.tuned tuned-cross
 ```
@@ -86,7 +89,7 @@ QEMU 僅用於 correctness，不使用其 latency 當作 ARM 實機效能。
 ## Native ARM / Phison
 
 ```bash
-cd tmac_ARM
+cd tmac_ARM/CPU
 make
 make -f Makefile.tuned tuned
 ```
