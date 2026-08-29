@@ -1,0 +1,12 @@
+T-MAC CPU Comparison Validation
+========================================
+
+STATUS: PASS
+
+Lab expected logs: 15
+Lab parsed RESULT rows: 375
+Expected lab RESULT rows: 375
+Original T-MAC summary rows: 75
+Expected original T-MAC summary rows: 75
+
+No validation errors or warnings.

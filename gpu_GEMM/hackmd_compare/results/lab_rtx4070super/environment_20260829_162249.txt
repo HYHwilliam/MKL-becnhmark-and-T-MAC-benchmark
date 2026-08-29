@@ -1,0 +1,24 @@
+===== DATE =====
+2026-08-29T16:22:49+08:00
+
+===== GIT =====
+971800f758b629a2b194a8872d0636d12cbb5117
+?? gpu_GEMM/
+?? x86_GEMM/hackmd_compare/compare_tmac_cpus.py
+?? x86_GEMM/hackmd_compare/results/cpu_tmac_compare/
+?? x86_GEMM/hackmd_compare/results/lab_ryzen8500g/
+
+===== GPU =====
+NVIDIA GeForce RTX 4070 SUPER, 580.173.02, 12282 MiB, 8.9
+
+===== CUDA =====
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2023 NVIDIA Corporation
+Built on Fri_Sep__8_19:17:24_PDT_2023
+Cuda compilation tools, release 12.3, V12.3.52
+Build cuda_12.3.r12.3/compiler.33281558_0
+
+CUDA_HOME=/usr/local/cuda
+
+===== HOST =====
+pei1005-B650M-GAMING-X-AX

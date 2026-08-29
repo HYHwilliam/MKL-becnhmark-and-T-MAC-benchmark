@@ -1,0 +1,12 @@
+cuBLAS vs T-MAC Validation
+========================================
+
+STATUS: PASS
+
+GPU logs expected: 5
+GPU RESULT rows parsed: 25
+GPU RESULT rows expected: 25
+CPU T-MAC configurations: 75
+CPU configurations expected: 75
+
+No validation errors or warnings.
