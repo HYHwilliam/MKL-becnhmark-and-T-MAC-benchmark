@@ -1,0 +1,30 @@
+VALIDATION: PASS
+
+Warnings:
+- High variation: MKL 256x256x256 1T, CV=173.2%.
+- High variation: MKL 256x256x256 2T, CV=140.5%.
+- High variation: MKL 256x256x256 4T, CV=128.1%.
+- High variation: MKL 256x256x256 8T, CV=147.5%.
+- High variation: MKL 256x256x256 16T, CV=115.9%.
+- High variation: MKL 1024x1024x1024 2T, CV=23.2%.
+- High variation: MKL 1024x1024x1024 4T, CV=28.1%.
+- High variation: MKL 1024x1024x1024 8T, CV=22.9%.
+- High variation: MKL 1024x1024x1024 16T, CV=37.7%.
+- High variation: MKL 4096x1024x2048 4T, CV=26.1%.
+- High variation: MKL 4096x1024x2048 16T, CV=20.7%.
+- High variation: MKL 1024x1024x512 1T, CV=55.5%.
+- High variation: MKL 1024x1024x512 2T, CV=55.2%.
+- High variation: MKL 1024x1024x512 4T, CV=56.8%.
+- High variation: MKL 1024x1024x512 8T, CV=60.2%.
+- High variation: MKL 1024x1024x512 16T, CV=33.8%.
+- High variation: T-MAC W2A16 256x256x256 4T, CV=26.1%.
+- High variation: T-MAC W2A16 1024x1024x512 1T, CV=33.8%.
+- High variation: T-MAC W2A16 1024x1024x512 2T, CV=38.0%.
+- High variation: T-MAC W2A16 1024x1024x512 4T, CV=37.9%.
+- High variation: T-MAC W2A16 1024x1024x512 8T, CV=45.2%.
+- High variation: T-MAC W3A16 256x256x256 2T, CV=33.8%.
+- High variation: T-MAC W3A16 256x256x256 4T, CV=20.6%.
+- High variation: T-MAC W3A16 256x256x256 8T, CV=21.2%.
+- High variation: T-MAC W3A16 4096x4096x4096 1T, CV=26.4%.
+- High variation: T-MAC W3A16 1024x1024x512 1T, CV=20.3%.
+- High variation: T-MAC W4A16 1024x1024x512 8T, CV=64.3%.

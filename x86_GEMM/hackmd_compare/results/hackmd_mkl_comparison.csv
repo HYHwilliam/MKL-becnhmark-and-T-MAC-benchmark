@@ -1,0 +1,26 @@
+Shape,Threads,HackMD MKL (ms),Local MKL Median (ms),Local / HackMD,Latency Difference (%),Reference Note
+256x256x256,1,0.236500,0.135663,0.5736,-42.64,HackMD first table dtype not explicitly stated
+256x256x256,2,0.246500,0.128059,0.5195,-48.05,HackMD first table dtype not explicitly stated
+256x256x256,4,0.146200,0.124377,0.8507,-14.93,HackMD first table dtype not explicitly stated
+256x256x256,8,0.325800,0.113813,0.3493,-65.07,HackMD first table dtype not explicitly stated
+256x256x256,16,0.408100,0.129488,0.3173,-68.27,HackMD first table dtype not explicitly stated
+1024x1024x1024,1,16.757000,7.219003,0.4308,-56.92,HackMD first table dtype not explicitly stated
+1024x1024x1024,2,12.300200,9.509686,0.7731,-22.69,HackMD first table dtype not explicitly stated
+1024x1024x1024,4,6.482800,7.205394,1.1115,11.15,HackMD first table dtype not explicitly stated
+1024x1024x1024,8,3.575700,9.024728,2.5239,152.39,HackMD first table dtype not explicitly stated
+1024x1024x1024,16,5.927800,7.303773,1.2321,23.21,HackMD first table dtype not explicitly stated
+4096x4096x4096,1,2071.977700,331.529382,0.1600,-84.00,HackMD first table dtype not explicitly stated
+4096x4096x4096,2,1048.065300,320.147220,0.3055,-69.45,HackMD first table dtype not explicitly stated
+4096x4096x4096,4,527.367700,344.963007,0.6541,-34.59,HackMD first table dtype not explicitly stated
+4096x4096x4096,8,266.501900,324.934291,1.2193,21.93,HackMD first table dtype not explicitly stated
+4096x4096x4096,16,260.432100,325.084963,1.2483,24.83,HackMD first table dtype not explicitly stated
+4096x1024x2048,1,260.955100,51.362234,0.1968,-80.32,HackMD first table dtype not explicitly stated
+4096x1024x2048,2,130.760300,59.343846,0.4538,-54.62,HackMD first table dtype not explicitly stated
+4096x1024x2048,4,65.712300,49.865959,0.7589,-24.11,HackMD first table dtype not explicitly stated
+4096x1024x2048,8,33.263400,51.740336,1.5555,55.55,HackMD first table dtype not explicitly stated
+4096x1024x2048,16,72.782800,50.053476,0.6877,-31.23,HackMD first table dtype not explicitly stated
+1024x1024x512,1,3.410722,4.775016,1.4000,40.00,FP16 confirmed
+1024x1024x512,2,3.164299,3.488027,1.1023,10.23,FP16 confirmed
+1024x1024x512,4,3.135987,3.464960,1.1049,10.49,FP16 confirmed
+1024x1024x512,8,3.123567,3.475464,1.1127,11.27,FP16 confirmed
+1024x1024x512,16,3.145073,5.068800,1.6117,61.17,FP16 confirmed

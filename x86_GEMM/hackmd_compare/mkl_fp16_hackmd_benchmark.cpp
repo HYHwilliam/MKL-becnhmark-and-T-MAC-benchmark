@@ -261,8 +261,8 @@ void run_shape(
             << "category=\"" << shape.category << "\" "
             << "shape="
             << shape.M << "x"
-            << shape.K << "x"
-            << shape.N << " "
+            << shape.N << "x"
+            << shape.K << " "
             << "threads=" << threads << " "
             << "total_ms="
             << std::fixed
@@ -330,14 +330,14 @@ int main(int argc, char** argv)
         },
         {
             4096,
-            1024,
             2048,
+            1024,
             "Rectangular"
         },
         {
             1024,
-            1024,
             512,
+            1024,
             "Medium Rectangular"
         }
     };

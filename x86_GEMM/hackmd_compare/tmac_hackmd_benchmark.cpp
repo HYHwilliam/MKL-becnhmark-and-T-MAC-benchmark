@@ -134,7 +134,25 @@ void run_shape(const Shape& shape, const std::vector<int>& thread_counts, bool a
         const double p90_ms = percentile(totals, 0.90);
         const double gflops = logical_flops / (total_ms / 1000.0) / 1e9;
         const double checksum = checksum_fp16(output.data(), output.size());
-        std::cout << "RESULT category=\"" << shape.category << "\" bit=W" << Bits << " shape=" << shape.M << "x" << shape.K << "x" << shape.N << " threads=" << requested_threads << " active_threads=" << active_threads << " bm=" << schedule.bm << " bn=" << schedule.bn << " kfactor=" << schedule.kfactor << " total_ms=" << std::fixed << std::setprecision(6) << total_ms << " preprocess_ms=" << preprocess_ms << " kernel_ms=" << kernel_ms << " p90_ms=" << p90_ms << " gflops=" << gflops << " samples=" << samples << " autotuned=" << (prepared.autotuned ? 1 : 0) << " tuning_ms=" << prepared.tuning_ms << " checksum=" << checksum << "\n";
+        std::cout
+            << "RESULT category=\"" << shape.category
+            << "\" bit=W" << Bits
+            << " shape=" << shape.M << "x" << shape.N << "x" << shape.K
+            << " threads=" << requested_threads
+            << " active_threads=" << active_threads
+            << " bm=" << schedule.bm
+            << " bn=" << schedule.bn
+            << " kfactor=" << schedule.kfactor
+            << " total_ms=" << std::fixed << std::setprecision(6) << total_ms
+            << " preprocess_ms=" << preprocess_ms
+            << " kernel_ms=" << kernel_ms
+            << " p90_ms=" << p90_ms
+            << " gflops=" << gflops
+            << " samples=" << samples
+            << " autotuned=" << (prepared.autotuned ? 1 : 0)
+            << " tuning_ms=" << prepared.tuning_ms
+            << " checksum=" << checksum
+            << "\n";
     }
 }
 
@@ -145,8 +163,8 @@ void run_suite(const std::vector<int>& thread_counts, bool quick, bool autotune)
         {256, 256, 256, "Small Square"},
         {1024, 1024, 1024, "Medium Square"},
         {4096, 4096, 4096, "Large Square"},
-        {4096, 1024, 2048, "Rectangular"},
-        {1024, 1024, 512, "Medium Rectangular"}
+        {4096, 2048, 1024, "Rectangular"},
+        {1024, 512, 1024, "Medium Rectangular"}
     };
 
     std::cout << "==================================================================\n";
@@ -176,7 +194,7 @@ int main(int argc, char** argv)
         else if (arg == "--threads" && i + 1 < argc) threads = parse_threads(argv[++i]);
         else
         {
-            std::cerr << "Usage: " << argv[0] << " [--bits 2|3|4] [--threads 1,2,4,8] [--quick] [--autotune]\n";
+            std::cerr << "Usage: " << argv[0] << " [--bits 2|3|4] [--threads 1,2,4,8,16] [--quick] [--autotune]\n";
             return 1;
         }
     }
