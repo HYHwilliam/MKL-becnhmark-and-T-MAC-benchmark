@@ -1,0 +1,77 @@
+]633;E;echo "===== STANDALONE VLA W2 =====";2d8356c7-35e2-4477-be6f-691ca5d1a50a]633;C===== STANDALONE VLA W2 =====
+RESULT category="BitVLA Action Residual" bit=W2 shape=2560x8x2560 threads=1 active_threads=1 bm=320 bn=8 kfactor=16 total_ms=1.009026 preprocess_ms=0.037753 kernel_ms=0.971273 p90_ms=2.700110 gflops=103.919621 samples=11 autotuned=1 tuning_ms=207.265156 checksum=5315.017090
+RESULT category="BitVLA Action Residual" bit=W2 shape=2560x8x2560 threads=4 active_threads=4 bm=320 bn=8 kfactor=16 total_ms=0.711875 preprocess_ms=0.052165 kernel_ms=0.672941 p90_ms=0.749810 gflops=147.297770 samples=11 autotuned=1 tuning_ms=228.306742 checksum=5315.017090
+RESULT category="BitVLA Action Residual" bit=W2 shape=2560x8x2560 threads=8 active_threads=5 bm=1024 bn=8 kfactor=16 total_ms=0.626620 preprocess_ms=0.058080 kernel_ms=0.559918 p90_ms=0.947908 gflops=167.338419 samples=11 autotuned=1 tuning_ms=244.406984 checksum=5315.017090
+RESULT category="BitVLA Action FC1" bit=W2 shape=2560x8x17920 threads=1 active_threads=1 bm=320 bn=8 kfactor=16 total_ms=9.242258 preprocess_ms=0.252434 kernel_ms=8.993197 p90_ms=11.054223 gflops=79.418168 samples=11 autotuned=1 tuning_ms=966.168570 checksum=1070.147701
+RESULT category="BitVLA Action FC1" bit=W2 shape=2560x8x17920 threads=4 active_threads=4 bm=512 bn=8 kfactor=16 total_ms=11.368310 preprocess_ms=0.264817 kernel_ms=11.103493 p90_ms=18.205203 gflops=64.565727 samples=11 autotuned=1 tuning_ms=718.853506 checksum=1070.147701
+RESULT category="BitVLA Action FC1" bit=W2 shape=2560x8x17920 threads=8 active_threads=8 bm=512 bn=8 kfactor=16 total_ms=13.520011 preprocess_ms=0.276244 kernel_ms=12.654379 p90_ms=17.759288 gflops=54.290133 samples=11 autotuned=1 tuning_ms=911.884837 checksum=1070.147701
+RESULT category="BitVLA Vision Attention" bit=W2 shape=1152x256x1152 threads=1 active_threads=1 bm=128 bn=64 kfactor=16 total_ms=6.875158 preprocess_ms=0.497545 kernel_ms=6.369715 p90_ms=7.639927 gflops=98.830783 samples=11 autotuned=1 tuning_ms=245.767539 checksum=-5808.096043
+RESULT category="BitVLA Vision Attention" bit=W2 shape=1152x256x1152 threads=4 active_threads=4 bm=128 bn=32 kfactor=16 total_ms=2.130993 preprocess_ms=0.496406 kernel_ms=1.603892 p90_ms=3.224042 gflops=318.854754 samples=11 autotuned=1 tuning_ms=261.452508 checksum=-5808.096043
+RESULT category="BitVLA Vision Attention" bit=W2 shape=1152x256x1152 threads=8 active_threads=8 bm=128 bn=64 kfactor=16 total_ms=9.829115 preprocess_ms=0.779007 kernel_ms=9.016161 p90_ms=11.760944 gflops=69.129036 samples=11 autotuned=1 tuning_ms=430.396154 checksum=-5808.096043
+RESULT category="Pi0 Expert Q" bit=W2 shape=2048x32x1024 threads=1 active_threads=1 bm=256 bn=32 kfactor=16 total_ms=1.275678 preprocess_ms=0.054788 kernel_ms=1.219086 p90_ms=1.636538 gflops=105.212858 samples=11 autotuned=1 tuning_ms=160.239812 checksum=2198.364833
+RESULT category="Pi0 Expert Q" bit=W2 shape=2048x32x1024 threads=4 active_threads=4 bm=512 bn=16 kfactor=16 total_ms=0.895989 preprocess_ms=0.080195 kernel_ms=0.815725 p90_ms=1.315195 gflops=149.798410 samples=11 autotuned=1 tuning_ms=158.090312 checksum=2198.364833
+RESULT category="Pi0 Expert Q" bit=W2 shape=2048x32x1024 threads=8 active_threads=4 bm=1024 bn=8 kfactor=16 total_ms=0.866319 preprocess_ms=0.061404 kernel_ms=0.801011 p90_ms=0.900548 gflops=154.928759 samples=11 autotuned=1 tuning_ms=355.269654 checksum=2198.364833
+RESULT category="Pi0 Expert KV" bit=W2 shape=256x32x1024 threads=1 active_threads=1 bm=256 bn=32 kfactor=16 total_ms=0.213035 preprocess_ms=0.057422 kernel_ms=0.154589 p90_ms=0.233838 gflops=78.753332 samples=21 autotuned=1 tuning_ms=16.023190 checksum=-218.968645
+RESULT category="Pi0 Expert KV" bit=W2 shape=256x32x1024 threads=4 active_threads=2 bm=256 bn=64 kfactor=16 total_ms=0.140189 preprocess_ms=0.059803 kernel_ms=0.080261 p90_ms=0.148890 gflops=119.675695 samples=21 autotuned=1 tuning_ms=16.619149 checksum=-218.968645
+RESULT category="Pi0 Expert KV" bit=W2 shape=256x32x1024 threads=8 active_threads=2 bm=256 bn=8 kfactor=16 total_ms=0.141029 preprocess_ms=0.060178 kernel_ms=0.080595 p90_ms=0.144714 gflops=118.962880 samples=21 autotuned=1 tuning_ms=14.623173 checksum=-218.968645
+RESULT category="Pi0 Expert O" bit=W2 shape=1024x32x2048 threads=1 active_threads=1 bm=128 bn=32 kfactor=16 total_ms=1.289127 preprocess_ms=0.110022 kernel_ms=1.179166 p90_ms=1.321232 gflops=104.115210 samples=11 autotuned=1 tuning_ms=161.832965 checksum=6812.506837
+RESULT category="Pi0 Expert O" bit=W2 shape=1024x32x2048 threads=4 active_threads=2 bm=1024 bn=64 kfactor=16 total_ms=0.730812 preprocess_ms=0.116254 kernel_ms=0.615342 p90_ms=0.818931 gflops=183.655616 samples=11 autotuned=1 tuning_ms=136.651875 checksum=6812.506837
+RESULT category="Pi0 Expert O" bit=W2 shape=1024x32x2048 threads=8 active_threads=2 bm=1024 bn=32 kfactor=16 total_ms=0.733036 preprocess_ms=0.113083 kernel_ms=0.620478 p90_ms=0.751956 gflops=183.098413 samples=11 autotuned=1 tuning_ms=245.500997 checksum=6812.506837
+RESULT category="Pi0 Expert GateUp" bit=W2 shape=4096x32x1024 threads=1 active_threads=1 bm=128 bn=8 kfactor=16 total_ms=3.306213 preprocess_ms=0.057686 kernel_ms=3.026863 p90_ms=4.375759 gflops=81.191217 samples=11 autotuned=1 tuning_ms=310.429021 checksum=4813.001010
+RESULT category="Pi0 Expert GateUp" bit=W2 shape=4096x32x1024 threads=4 active_threads=4 bm=128 bn=16 kfactor=16 total_ms=1.790392 preprocess_ms=0.064479 kernel_ms=1.707459 p90_ms=3.620805 gflops=149.931108 samples=11 autotuned=1 tuning_ms=236.871864 checksum=4813.001010
+RESULT category="Pi0 Expert GateUp" bit=W2 shape=4096x32x1024 threads=8 active_threads=8 bm=1024 bn=16 kfactor=16 total_ms=5.420172 preprocess_ms=0.093002 kernel_ms=5.315783 p90_ms=7.517492 gflops=49.525265 samples=11 autotuned=1 tuning_ms=607.654321 checksum=4813.001010
+RESULT category="Pi0 Expert Down" bit=W2 shape=1024x32x4096 threads=1 active_threads=1 bm=128 bn=32 kfactor=16 total_ms=2.727637 preprocess_ms=0.227663 kernel_ms=2.507886 p90_ms=3.698113 gflops=98.413189 samples=11 autotuned=1 tuning_ms=329.744914 checksum=4108.679024
+RESULT category="Pi0 Expert Down" bit=W2 shape=1024x32x4096 threads=4 active_threads=4 bm=128 bn=64 kfactor=16 total_ms=0.837071 preprocess_ms=0.222000 kernel_ms=0.608665 p90_ms=0.952063 gflops=320.684214 samples=11 autotuned=1 tuning_ms=219.174665 checksum=4108.679024
+RESULT category="Pi0 Expert Down" bit=W2 shape=1024x32x4096 threads=8 active_threads=2 bm=1024 bn=8 kfactor=16 total_ms=1.517664 preprocess_ms=0.222818 kernel_ms=1.291473 p90_ms=2.828523 gflops=176.874101 samples=11 autotuned=1 tuning_ms=509.589365 checksum=4108.679024
+
+===== STANDALONE VLA W4 =====
+RESULT category="BitVLA Action Residual" bit=W4 shape=2560x8x2560 threads=1 active_threads=1 bm=320 bn=8 kfactor=16 total_ms=2.108850 preprocess_ms=0.035758 kernel_ms=2.073092 p90_ms=3.542928 gflops=49.722645 samples=11 autotuned=1 tuning_ms=209.858247 checksum=5556.660564
+RESULT category="BitVLA Action Residual" bit=W4 shape=2560x8x2560 threads=4 active_threads=4 bm=640 bn=8 kfactor=16 total_ms=0.599483 preprocess_ms=0.035988 kernel_ms=0.563177 p90_ms=2.242635 gflops=174.913384 samples=11 autotuned=1 tuning_ms=200.051283 checksum=5556.660564
+RESULT category="BitVLA Action Residual" bit=W4 shape=2560x8x2560 threads=8 active_threads=8 bm=640 bn=8 kfactor=16 total_ms=5.826369 preprocess_ms=0.055059 kernel_ms=5.767352 p90_ms=8.198553 gflops=17.997075 samples=11 autotuned=1 tuning_ms=396.213292 checksum=5556.660564
+RESULT category="BitVLA Action FC1" bit=W4 shape=2560x8x17920 threads=1 active_threads=1 bm=256 bn=8 kfactor=16 total_ms=16.646802 preprocess_ms=0.250866 kernel_ms=16.397225 p90_ms=17.280542 gflops=44.092745 samples=11 autotuned=1 tuning_ms=1503.122694 checksum=-1695.595606
+RESULT category="BitVLA Action FC1" bit=W4 shape=2560x8x17920 threads=4 active_threads=4 bm=128 bn=8 kfactor=16 total_ms=10.603974 preprocess_ms=0.295927 kernel_ms=10.301284 p90_ms=12.937578 gflops=69.219634 samples=11 autotuned=1 tuning_ms=1425.460831 checksum=-1695.595606
+RESULT category="BitVLA Action FC1" bit=W4 shape=2560x8x17920 threads=8 active_threads=8 bm=256 bn=8 kfactor=16 total_ms=15.128524 preprocess_ms=0.278275 kernel_ms=13.982503 p90_ms=17.467319 gflops=48.517833 samples=11 autotuned=1 tuning_ms=1735.178449 checksum=-1695.595606
+RESULT category="BitVLA Vision Attention" bit=W4 shape=1152x256x1152 threads=1 active_threads=1 bm=128 bn=64 kfactor=16 total_ms=14.152036 preprocess_ms=0.523401 kernel_ms=13.638375 p90_ms=17.365384 gflops=48.012685 samples=11 autotuned=1 tuning_ms=795.087404 checksum=-2419.251777
+RESULT category="BitVLA Vision Attention" bit=W4 shape=1152x256x1152 threads=4 active_threads=4 bm=256 bn=8 kfactor=16 total_ms=8.764793 preprocess_ms=0.771685 kernel_ms=8.187757 p90_ms=9.913239 gflops=77.523479 samples=11 autotuned=1 tuning_ms=533.840335 checksum=-2419.251777
+RESULT category="BitVLA Vision Attention" bit=W4 shape=1152x256x1152 threads=8 active_threads=8 bm=128 bn=32 kfactor=16 total_ms=5.661694 preprocess_ms=0.766769 kernel_ms=4.849672 p90_ms=9.052404 gflops=120.013065 samples=11 autotuned=1 tuning_ms=406.986306 checksum=-2419.251777
+RESULT category="Pi0 Expert Q" bit=W4 shape=2048x32x1024 threads=1 active_threads=1 bm=256 bn=16 kfactor=16 total_ms=2.484911 preprocess_ms=0.055825 kernel_ms=2.428995 p90_ms=3.354636 gflops=54.013093 samples=11 autotuned=1 tuning_ms=359.526393 checksum=3020.422060
+RESULT category="Pi0 Expert Q" bit=W4 shape=2048x32x1024 threads=4 active_threads=4 bm=128 bn=64 kfactor=16 total_ms=0.808775 preprocess_ms=0.056886 kernel_ms=0.751889 p90_ms=1.374260 gflops=165.951875 samples=11 autotuned=1 tuning_ms=408.116260 checksum=3020.422060
+RESULT category="Pi0 Expert Q" bit=W4 shape=2048x32x1024 threads=8 active_threads=8 bm=1024 bn=64 kfactor=16 total_ms=5.517472 preprocess_ms=0.075348 kernel_ms=5.433628 p90_ms=8.947170 gflops=24.325946 samples=11 autotuned=1 tuning_ms=515.561338 checksum=3020.422060
+RESULT category="Pi0 Expert KV" bit=W4 shape=256x32x1024 threads=1 active_threads=1 bm=256 bn=8 kfactor=16 total_ms=0.368738 preprocess_ms=0.057964 kernel_ms=0.310601 p90_ms=0.424704 gflops=45.499016 samples=21 autotuned=1 tuning_ms=39.355340 checksum=-162.613199
+RESULT category="Pi0 Expert KV" bit=W4 shape=256x32x1024 threads=4 active_threads=4 bm=256 bn=32 kfactor=16 total_ms=0.143710 preprocess_ms=0.063535 kernel_ms=0.079933 p90_ms=0.166543 gflops=116.743553 samples=21 autotuned=1 tuning_ms=30.547978 checksum=-162.613199
+RESULT category="Pi0 Expert KV" bit=W4 shape=256x32x1024 threads=8 active_threads=4 bm=256 bn=8 kfactor=16 total_ms=0.146464 preprocess_ms=0.065064 kernel_ms=0.081819 p90_ms=0.164510 gflops=114.548394 samples=21 autotuned=1 tuning_ms=191.216345 checksum=-162.613199
+RESULT category="Pi0 Expert O" bit=W4 shape=1024x32x2048 threads=1 active_threads=1 bm=128 bn=32 kfactor=16 total_ms=2.492486 preprocess_ms=0.111556 kernel_ms=2.374354 p90_ms=2.842619 gflops=53.848940 samples=11 autotuned=1 tuning_ms=304.244194 checksum=7605.041462
+RESULT category="Pi0 Expert O" bit=W4 shape=1024x32x2048 threads=4 active_threads=4 bm=1024 bn=16 kfactor=16 total_ms=0.718409 preprocess_ms=0.110161 kernel_ms=0.608248 p90_ms=0.768158 gflops=186.826345 samples=11 autotuned=1 tuning_ms=402.215668 checksum=7605.041462
+RESULT category="Pi0 Expert O" bit=W4 shape=1024x32x2048 threads=8 active_threads=4 bm=1024 bn=64 kfactor=16 total_ms=1.714961 preprocess_ms=0.129049 kernel_ms=1.588377 p90_ms=1.832850 gflops=78.262846 samples=11 autotuned=1 tuning_ms=607.541599 checksum=7605.041462
+RESULT category="Pi0 Expert GateUp" bit=W4 shape=4096x32x1024 threads=1 active_threads=1 bm=256 bn=16 kfactor=16 total_ms=6.101990 preprocess_ms=0.058712 kernel_ms=6.045829 p90_ms=8.931166 gflops=43.991461 samples=11 autotuned=1 tuning_ms=629.531791 checksum=9899.662396
+RESULT category="Pi0 Expert GateUp" bit=W4 shape=4096x32x1024 threads=4 active_threads=4 bm=1024 bn=8 kfactor=16 total_ms=1.343368 preprocess_ms=0.056511 kernel_ms=1.287138 p90_ms=1.481819 gflops=199.822726 samples=11 autotuned=1 tuning_ms=520.482282 checksum=9899.662396
+RESULT category="Pi0 Expert GateUp" bit=W4 shape=4096x32x1024 threads=8 active_threads=8 bm=1024 bn=32 kfactor=16 total_ms=3.082680 preprocess_ms=0.083664 kernel_ms=2.999016 p90_ms=3.834260 gflops=87.078599 samples=11 autotuned=1 tuning_ms=703.450346 checksum=9899.662396
+RESULT category="Pi0 Expert Down" bit=W4 shape=1024x32x4096 threads=1 active_threads=1 bm=128 bn=16 kfactor=16 total_ms=5.180279 preprocess_ms=0.224256 kernel_ms=4.956023 p90_ms=5.685608 gflops=51.818726 samples=11 autotuned=1 tuning_ms=694.824981 checksum=7871.833084
+RESULT category="Pi0 Expert Down" bit=W4 shape=1024x32x4096 threads=4 active_threads=4 bm=1024 bn=32 kfactor=16 total_ms=1.517425 preprocess_ms=0.227989 kernel_ms=1.284729 p90_ms=1.780643 gflops=176.901960 samples=11 autotuned=1 tuning_ms=587.255642 checksum=7871.833084
+RESULT category="Pi0 Expert Down" bit=W4 shape=1024x32x4096 threads=8 active_threads=8 bm=512 bn=64 kfactor=16 total_ms=10.039415 preprocess_ms=0.379703 kernel_ms=9.214112 p90_ms=13.141302 gflops=26.738157 samples=11 autotuned=1 tuning_ms=718.081237 checksum=7871.833084
+
+===== OFFICIAL HACKMD W2 =====
+===== T1 =====
+suite,shape_mnk,M,K,N,bits,num_threads,dtype,qgemm_lut
+hackmd_safe,256x256x256,256,256,256,2,1,int8,0.31096460000000004
+hackmd_safe,1024x1024x1024,1024,1024,1024,2,1,int8,17.2964333
+hackmd_safe,4096x1024x2048,4096,2048,1024,2,1,int8,136.9491878
+hackmd_safe,1024x1024x512,1024,512,1024,2,1,int8,9.094524400000001
+===== T2 =====
+suite,shape_mnk,M,K,N,bits,num_threads,dtype,qgemm_lut
+hackmd_safe,256x256x256,256,256,256,2,2,int8,0.3501325
+hackmd_safe,1024x1024x1024,1024,1024,1024,2,2,int8,8.8272746
+hackmd_safe,4096x1024x2048,4096,2048,1024,2,2,int8,68.5672697
+hackmd_safe,1024x1024x512,1024,512,1024,2,2,int8,4.6003195
+===== T4 =====
+suite,shape_mnk,M,K,N,bits,num_threads,dtype,qgemm_lut
+hackmd_safe,256x256x256,256,256,256,2,4,int8,0.1852149
+hackmd_safe,1024x1024x1024,1024,1024,1024,2,4,int8,4.3659433
+hackmd_safe,4096x1024x2048,4096,2048,1024,2,4,int8,40.5097618
+hackmd_safe,1024x1024x512,1024,512,1024,2,4,int8,3.7711350000000006
+===== T8 =====
+suite,shape_mnk,M,K,N,bits,num_threads,dtype,qgemm_lut
+hackmd_safe,256x256x256,256,256,256,2,8,int8,0.10408579999999999
+hackmd_safe,1024x1024x1024,1024,1024,1024,2,8,int8,6.0040742
+hackmd_safe,4096x1024x2048,4096,2048,1024,2,8,int8,43.1150932
+hackmd_safe,1024x1024x512,1024,512,1024,2,8,int8,3.0445851999999998

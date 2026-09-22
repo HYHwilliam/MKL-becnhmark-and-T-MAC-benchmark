@@ -37,3 +37,18 @@ __pycache__/
 .vscode/
 tmac_ARM/NPU/build/
 tmac_ARM/benchmark/results/**/*.log
+
+# External upstream repository
+/T-MAC-official-x86/
+
+# Temporary manual source backups
+*.before_*
+
+# Official comparison generated runs
+/official_compare/results/raw/
+/official_compare/results/runs/
+
+# Generated VLA benchmark executable
+/x86_GEMM/vla_compare/tmac_vla_benchmark
+/x86_GEMM/hackmd_compare/tmac_hackmd_benchmark
+/x86_GEMM/hackmd_compare/mkl_fp16_hackmd_benchmark
