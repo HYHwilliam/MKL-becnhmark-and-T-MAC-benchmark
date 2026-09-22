@@ -15,7 +15,8 @@
 
 - **CPU backend 同一列最快的 latency 會加粗。**
 - GPU 沒有 CPU thread 數，因此同一 matrix 的 cuBLAS latency 會重複顯示，只是方便直接比較。
-- Official 目前沒有可信的 `4096×4096×4096` 結果，因此保留 `—`。
+- Official `4096×4096×4096` 沒有可信 tuned result，因此保留 `—`。
+- Official `4096×1024×2048` W2 1T 的所有 tuning candidates 都失敗並觸發 fallback，因此標成 `— (fallback)`，不納入正式比較。
 - Official 目前只整理 1 / 2 / 4 / 8T，因此 16T 顯示 `—`。
 - 16T 保留原 HackMD sweep 結果，但屬高 thread-count / oversubscription 參考，不當作主要結論。
 
@@ -38,7 +39,7 @@
 | Large Square | **4096×4096×4096** | 4 | **344.963** | 381.560 | 631.803 | 826.431 | — | 1.986 |
 | Large Square | **4096×4096×4096** | 8 | 324.934 | **320.574** | 529.392 | 712.419 | — | 1.986 |
 | Large Square | **4096×4096×4096** | 16 | **325.085** | 435.729 | 599.435 | 671.333 | — | 1.986 |
-| Rectangular | **4096×1024×2048** | 1 | **51.362** | 184.947 | 275.047 | 273.532 | 136.949 | 0.278 |
+| Rectangular | **4096×1024×2048** | 1 | **51.362** | 184.947 | 275.047 | 273.532 | — (fallback) | 0.278 |
 | Rectangular | **4096×1024×2048** | 2 | **59.344** | 91.515 | 131.710 | 173.782 | 68.567 | 0.278 |
 | Rectangular | **4096×1024×2048** | 4 | 49.866 | 49.083 | 73.907 | 104.054 | **40.510** | 0.278 |
 | Rectangular | **4096×1024×2048** | 8 | 51.740 | 45.987 | 73.204 | 91.422 | **43.115** | 0.278 |
@@ -68,7 +69,7 @@
 - **256×256×256**：CPU 最快是 Microsoft Official W2 8T，0.104 ms。
 - **1024×1024×1024**：CPU 最快是 Microsoft Official W2 4T，4.366 ms。
 - **4096×4096×4096**：目前有效結果中 MKL 2T 最快，320.147 ms；Official 尚無可信結果。
-- **4096×1024×2048**：CPU 最快是 Microsoft Official W2 4T，40.510 ms。
+- **4096×1024×2048**：CPU 最快是 Microsoft Official W2 4T，40.510 ms；Official 1T 為 fallback，不納入比較。
 - **1024×1024×512**：CPU 最快是 Microsoft Official W2 8T，3.045 ms。
 
 所以現在不能簡化成「T-MAC 一定比 MKL 快」或「矩陣越大 T-MAC 越差」。
@@ -136,6 +137,7 @@ Official 優勢開始明顯：
 
 這是本專案 T-MAC 表現相對好的大型 rectangular case：
 
+- Official W2 1T：**tuning 全部失敗，fallback，不納入比較**
 - Official W2 4T：**40.510 ms**
 - 本專案 W2 16T：43.478 ms
 - 本專案 W2 8T：45.987 ms
@@ -171,7 +173,7 @@ Official 優勢開始明顯：
 - `4096×1024×2048`：本專案 W2 8T / 16T 已經快過 MKL。
 - 但其他 shape 增加 thread 後可能反而退化。
 
-這和 VLA 測試看到的結果一致：**4T 通常有效，8T 常出現 regression。**
+這和 VLA 測試看到的結果一致：**本專案 4T 通常有效，但 8T 常出現 regression；Microsoft Official VLA 的 scaling 整體明顯更穩定。**
 
 ---
 
@@ -179,37 +181,59 @@ Official 優勢開始明顯：
 
 VLA 使用另一組 matrix shapes，因此不混進上面的 HackMD 主表。
 
+這裡直接把 **本專案 T-MAC** 與 **Microsoft Official T-MAC** 的相同 workload 放在一起比較。粗體代表同一個 thread 數下 latency 較低的一方。
+
+Official VLA 已完成 AutoTVM tuning audit：
+
+- W2：231 tuning records，**0 failed**
+- W4：252 tuning records，**0 failed**
+- 合計：483 tuning records，**0 failed**
+
 ### W2
 
-| Workload | Matrix (M×N×K) | 1T | 4T | 8T | 最快 |
-|---|---:|---:|---:|---:|---:|
-| Action Residual | **2560×8×2560** | 1.009 | 0.712 | **0.627** | 8T |
-| Action FC1 | **2560×8×17920** | **9.242** | 11.368 | 13.520 | 1T |
-| Vision Attention | **1152×256×1152** | 6.875 | **2.131** | 9.829 | 4T |
-| Pi0 Expert Q | **2048×32×1024** | 1.276 | 0.896 | **0.866** | 8T |
-| Pi0 Expert KV | **256×32×1024** | 0.213 | **0.140** | 0.141 | 4T |
-| Pi0 Expert O | **1024×32×2048** | 1.289 | **0.731** | 0.733 | 4T |
-| Pi0 Expert GateUp | **4096×32×1024** | 3.306 | **1.790** | 5.420 | 4T |
-| Pi0 Expert Down | **1024×32×4096** | 2.728 | **0.837** | 1.518 | 4T |
+| Workload | Matrix (M×N×K) | 本專案 1T | Official 1T | 本專案 4T | Official 4T | 本專案 8T | Official 8T |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Action Residual | **2560×8×2560** | 1.009 | **0.819** | 0.712 | **0.217** | 0.627 | **0.211** |
+| Action FC1 | **2560×8×17920** | 9.242 | **6.187** | 11.368 | **1.485** | 13.520 | **1.519** |
+| Vision Attention | **1152×256×1152** | 6.875 | **5.470** | 2.131 | **1.384** | 9.829 | **1.388** |
+| Pi0 Expert Q | **2048×32×1024** | 1.276 | **1.077** | 0.896 | **0.280** | 0.866 | **0.288** |
+| Pi0 Expert KV | **256×32×1024** | 0.213 | **0.136** | 0.140 | **0.133** | 0.141 | **0.133** |
+| Pi0 Expert O | **1024×32×2048** | 1.289 | **1.057** | 0.731 | **0.281** | 0.733 | **0.281** |
+| Pi0 Expert GateUp | **4096×32×1024** | 3.306 | **2.184** | 1.790 | **0.558** | 5.420 | **0.578** |
+| Pi0 Expert Down | **1024×32×4096** | 2.728 | **2.064** | 0.837 | **0.545** | 1.518 | **0.541** |
 
-**W2：1T→4T 有 7/8 個 shape 變快，但 4T→8T 有 6/8 個 shape 反而變慢。**
+**W2：Official 在 8 個 workload × 3 種 thread 數，共 24/24 組 matched comparison 中 latency 都較低。**
+
+本專案方面仍維持原本觀察：
+
+- 1T→4T：7/8 個 shape 變快。
+- 4T→8T：6/8 個 shape 反而變慢。
+
+Official 則在 1T→4T 全部明顯改善；4T→8T 多數已接近飽和，變化通常小很多。
 
 ### W4
 
-| Workload | Matrix (M×N×K) | 1T | 4T | 8T | 最快 |
-|---|---:|---:|---:|---:|---:|
-| Action Residual | **2560×8×2560** | 2.109 | **0.599** | 5.826 | 4T |
-| Action FC1 | **2560×8×17920** | 16.647 | **10.604** | 15.129 | 4T |
-| Vision Attention | **1152×256×1152** | 14.152 | 8.765 | **5.662** | 8T |
-| Pi0 Expert Q | **2048×32×1024** | 2.485 | **0.809** | 5.517 | 4T |
-| Pi0 Expert KV | **256×32×1024** | 0.369 | **0.144** | 0.146 | 4T |
-| Pi0 Expert O | **1024×32×2048** | 2.492 | **0.718** | 1.715 | 4T |
-| Pi0 Expert GateUp | **4096×32×1024** | 6.102 | **1.343** | 3.083 | 4T |
-| Pi0 Expert Down | **1024×32×4096** | 5.180 | **1.517** | 10.039 | 4T |
+| Workload | Matrix (M×N×K) | 本專案 1T | Official 1T | 本專案 4T | Official 4T | 本專案 8T | Official 8T |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Action Residual | **2560×8×2560** | 2.109 | **1.623** | 0.599 | **0.411** | 5.826 | **0.413** |
+| Action FC1 | **2560×8×17920** | 16.647 | **11.731** | 10.604 | **3.000** | 15.129 | **3.053** |
+| Vision Attention | **1152×256×1152** | 14.152 | **11.006** | 8.765 | **2.788** | 5.662 | **2.803** |
+| Pi0 Expert Q | **2048×32×1024** | 2.485 | **2.145** | 0.809 | **0.558** | 5.517 | **0.573** |
+| Pi0 Expert KV | **256×32×1024** | 0.369 | **0.267** | **0.144** | 0.267 | 0.146 | **0.142** |
+| Pi0 Expert O | **1024×32×2048** | 2.492 | **2.092** | **0.718** | 1.056 | 1.715 | **0.548** |
+| Pi0 Expert GateUp | **4096×32×1024** | 6.102 | **4.315** | 1.343 | **1.109** | 3.083 | **2.282** |
+| Pi0 Expert Down | **1024×32×4096** | 5.180 | **4.306** | 1.517 | **1.068** | 10.039 | **1.074** |
 
-**W4：1T→4T 為 8/8 全部變快，但 4T→8T 有 7/8 個 shape 變慢。**
+**W4：Official 在 24 組 matched comparison 中有 22 組較快；本專案只有 Pi0 Expert KV 4T 與 Pi0 Expert O 4T 兩組較快。**
 
-這是目前後續最值得研究的地方。
+本專案方面：
+
+- 1T→4T：8/8 全部變快。
+- 4T→8T：7/8 反而變慢。
+
+這讓問題更明確：**本專案不是沒有 multithreading 效果，而是 high-thread-count schedule / work partition 明顯不穩定；Official generated kernel 在相同 VLA workload 下通常能維持更好的 scaling。**
+
+> 注意：本專案與 Official 的 dtype / timing harness 並非完全相同，因此上面的數字適合做 implementation-level latency comparison，不應直接解讀成純 kernel 或純演算法 speedup。
 
 ---
 
@@ -219,7 +243,8 @@ VLA 使用另一組 matrix shapes，因此不混進上面的 HackMD 主表。
 
 1. **Microsoft Official W2 是目前最穩定、也最常取得最佳 CPU latency 的 T-MAC reference。**
 2. **本專案 T-MAC W2 並不是大矩陣一定變慢。** 在大型 square 已能接近 MKL，在大型 rectangular 甚至能超過 MKL。
-3. **真正不穩定的是 thread scaling，尤其 4T→8T。**
-4. W3 / W4 的 bit-serial 工作量較高，多數情況 latency 高於 W2；但 schedule 仍會造成局部反例。
-5. RTX 4070 SUPER cuBLAS 是完全不同級別的 GPU dense-GEMM reference，但屬 cross-hardware comparison，不能直接當作演算法公平比較。
-6. 下一步最值得做的是固定 BM / BN / KFactor，控制 schedule 變因後比較 1T / 4T / 8T，才能進一步定位 high-thread regression 來源。
+3. **真正不穩定的是本專案的 thread scaling，尤其 4T→8T。** Official VLA 對照後，這個差異更清楚。
+4. Official VLA W2/W4 的 483 個 AutoTVM tuning records 全部通過；相較之下，HackMD 有少數 workload tuning 全失敗，因此相關 fallback 數字已排除。
+5. W3 / W4 的 bit-serial 工作量較高，多數情況 latency 高於 W2；但 schedule 仍會造成局部反例。
+6. RTX 4070 SUPER cuBLAS 是完全不同級別的 GPU dense-GEMM reference，但屬 cross-hardware comparison，不能直接當作演算法公平比較。
+7. 下一步最值得做的是固定 BM / BN / KFactor，控制 schedule 變因後比較 1T / 4T / 8T，才能進一步定位 high-thread regression 來源。
