@@ -113,7 +113,7 @@ def parse_args():
     parser.add_argument("-gs", "--group_size", type=int, default=128)
     parser.add_argument("-ags", "--act_group_size", type=int, default=64, help="-1 for BitNet-like unified scale")
     parser.add_argument("-fa", "--fast_aggregation", action="store_true")
-    parser.add_argument("--suite", choices=["smoke", "nscale1024", "vla_compare", "scaling", "hackmd_safe", "hackmd"], default="smoke")
+    parser.add_argument("--suite", choices=["smoke", "nscale1024", "vla_compare", "scaling", "hackmd_4096", "hackmd_safe", "hackmd"], default="smoke")
     parser.add_argument("--bits", type=int, choices=[2, 3, 4], default=2)
     parser.add_argument("--threads", type=str, default="1")
     return parser.parse_args()
@@ -147,6 +147,10 @@ def main():
             [1024, 2048, 32],     # O
             [4096, 1024, 32],     # Gate/Up
             [1024, 4096, 32],     # Down
+        ]
+    elif FLAGS.suite == "hackmd_4096":
+        MKNs = [
+            [4096, 4096, 4096],
         ]
     elif FLAGS.suite == "hackmd_safe":
         MKNs = [
